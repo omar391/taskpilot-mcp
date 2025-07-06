@@ -1,0 +1,24 @@
+{
+  "global_feedback_steps": [
+    {
+      "name": "analytical_validation",
+      "instructions": "Apply the 6-step analytical thinking framework to {{context.task_description}}:\n\n1. **Logical Consistency**: Evaluate statements for internal coherence and contradictions\n2. **Evidence Quality**: Assess the strength and reliability of supporting data/reasoning\n3. **Hidden Assumptions**: Identify unstated premises that may affect outcomes\n4. **Cognitive Biases**: Detect emotional reasoning, confirmation bias, or wishful thinking\n5. **Causal Relationships**: Verify claimed cause-and-effect relationships are valid\n6. **Alternative Perspectives**: Consider competing explanations or approaches\n\nIf validation passes, proceed to call the next tool. If validation fails, provide constructive feedback with specific suggestions for improvement."
+    },
+    {
+      "name": "post_task_validation",
+      "instructions": "After completing {{context.task_id}}, ensure quality standards:\n\n1. Run all relevant unit tests for modified code\n2. Check code formatting and linting compliance\n3. Verify task progress is accurately recorded (0-100%)\n4. Update connected file list with all modified files\n5. Create git commit with task ID reference\n6. Move completed task to done file\n\nOnly mark task as 100% complete when ALL checks pass. If any checks fail, provide specific remediation steps."
+    },
+    {
+      "name": "status_analysis",
+      "instructions": "Provide comprehensive project status analysis for {{context.workspace_path}}:\n\n1. Summarize tasks by status (Backlog, In-Progress, Blocked, Review, Done)\n2. Identify rule violations and compliance issues\n3. Highlight overdue or blocked tasks with reasons\n4. Calculate progress metrics and velocity trends\n5. Suggest priority adjustments based on dependencies\n6. Recommend next actions for project advancement\n\nPresent findings in a clear, actionable format with specific recommendations."
+    },
+    {
+      "name": "audit_analysis",
+      "instructions": "Perform thorough project audit for {{context.workspace_path}}:\n\n1. Review all task completion verification\n2. Identify orphaned dependencies and broken links\n3. Check for inconsistent task status updates\n4. Verify connected file lists are accurate\n5. Validate git commit references match tasks\n6. Suggest cleanup actions for project health\n\nProvide detailed findings with priority-ranked remediation steps."
+    },
+    {
+      "name": "github_validation",
+      "instructions": "Validate GitHub integration for {{context.repository_url}}:\n\n1. Verify repository connection and credentials\n2. Check bidirectional sync between tasks and issues\n3. Validate webhook configurations and event handling\n4. Ensure task status updates reflect GitHub changes\n5. Confirm issue creation from tasks is working\n6. Review any sync conflicts or missing data\n\nRecommend corrective actions for any integration issues found."
+    }
+  ]
+}

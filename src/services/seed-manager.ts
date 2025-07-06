@@ -13,22 +13,29 @@ export class SeedManager {
   constructor(private db: DatabaseManager) {}
 
   /**
-   * Load global seed data from JSON file
+   * Load global tool flows from JSON file
    */
-  private loadGlobalSeedData(): GlobalSeedData {
-    if (!this.globalSeedData) {
-      const seedPath = join(__dirname, '..', 'data', 'global-seed.json');
-      const seedContent = readFileSync(seedPath, 'utf8');
-      this.globalSeedData = JSON.parse(seedContent);
-    }
-    return this.globalSeedData!;
+  private loadGlobalToolFlows(): any {
+    const flowsPath = join(__dirname, '..', 'data', 'global-tool-flows.json');
+    const flowsContent = readFileSync(flowsPath, 'utf8');
+    return JSON.parse(flowsContent);
+  }
+
+  /**
+   * Load global feedback steps from JSON file
+   */
+  private loadGlobalFeedbackSteps(): any {
+    const stepsPath = join(__dirname, '..', 'data', 'global-feedback-steps.json');
+    const stepsContent = readFileSync(stepsPath, 'utf8');
+    return JSON.parse(stepsContent);
   }
 
   /**
    * Initialize global tool flows and feedback steps in database
    */
   async initializeGlobalData(): Promise<void> {
-    const seedData = this.loadGlobalSeedData();
+    const toolFlowsData = this.loadGlobalToolFlows();
+    const feedbackStepsData = this.loadGlobalFeedbackSteps();
 
     try {
       await this.db.transaction([
@@ -37,19 +44,19 @@ export class SeedManager {
         { sql: 'DELETE FROM feedback_steps WHERE workspace_id IS NULL' },
         
         // Insert global feedback steps
-        ...seedData.global_feedback_steps.map(step => ({
+        ...feedbackStepsData.global_feedback_steps.map((step: any) => ({
           sql: `INSERT INTO feedback_steps (id, name, instructions, workspace_id, metadata, created_at, updated_at)
                 VALUES (?, ?, ?, NULL, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
           params: [
             uuidv4(),
             step.name,
             step.instructions,
-            JSON.stringify(step.metadata)
+            JSON.stringify(step.metadata || {})
           ]
         })),
 
         // Insert global tool flows
-        ...seedData.global_tool_flows.flatMap(flow => [
+        ...toolFlowsData.global_tool_flows.flatMap((flow: any) => [
           // Insert tool flow
           {
             sql: `INSERT INTO tool_flows (id, tool_name, workspace_id, created_at, updated_at)
@@ -57,7 +64,7 @@ export class SeedManager {
             params: [flow.tool_name, flow.tool_name] // Use tool_name as ID for global flows
           },
           // Insert flow steps
-          ...flow.flow_steps.map(step => ({
+          ...flow.flow_steps.map((step: any) => ({
             sql: `INSERT INTO tool_flow_steps (id, tool_flow_id, step_order, system_tool_fn, feedback_step, next_tool)
                   VALUES (?, ?, ?, ?, ?, ?)`,
             params: [

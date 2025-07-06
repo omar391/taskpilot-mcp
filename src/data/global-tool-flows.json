@@ -1,0 +1,114 @@
+{
+  "global_tool_flows": [
+    {
+      "tool_name": "taskpilot_start",
+      "flow_steps": [
+        {
+          "step_order": 1,
+          "system_tool_fn": "taskpilot_start",
+          "feedback_step": null,
+          "next_tool": "end"
+        }
+      ]
+    },
+    {
+      "tool_name": "taskpilot_init",
+      "flow_steps": [
+        {
+          "step_order": 1,
+          "system_tool_fn": "taskpilot_init",
+          "feedback_step": null,
+          "next_tool": "end"
+        }
+      ]
+    },
+    {
+      "tool_name": "taskpilot_add",
+      "flow_steps": [
+        {
+          "step_order": 1,
+          "system_tool_fn": "taskpilot_add",
+          "feedback_step": "analytical_validation",
+          "next_tool": "taskpilot_create_task"
+        }
+      ]
+    },
+    {
+      "tool_name": "taskpilot_create_task",
+      "flow_steps": [
+        {
+          "step_order": 1,
+          "system_tool_fn": "taskpilot_create_task",
+          "feedback_step": null,
+          "next_tool": "end"
+        }
+      ]
+    },
+    {
+      "tool_name": "taskpilot_status",
+      "flow_steps": [
+        {
+          "step_order": 1,
+          "system_tool_fn": "taskpilot_status",
+          "feedback_step": "status_analysis",
+          "next_tool": "end"
+        }
+      ]
+    },
+    {
+      "tool_name": "taskpilot_update",
+      "flow_steps": [
+        {
+          "step_order": 1,
+          "system_tool_fn": "taskpilot_update",
+          "feedback_step": null,
+          "next_tool": "end"
+        }
+      ]
+    },
+    {
+      "tool_name": "taskpilot_focus",
+      "flow_steps": [
+        {
+          "step_order": 1,
+          "system_tool_fn": "taskpilot_focus",
+          "feedback_step": null,
+          "next_tool": "end"
+        }
+      ]
+    },
+    {
+      "tool_name": "taskpilot_audit",
+      "flow_steps": [
+        {
+          "step_order": 1,
+          "system_tool_fn": "taskpilot_audit",
+          "feedback_step": "audit_analysis",
+          "next_tool": "end"
+        }
+      ]
+    },
+    {
+      "tool_name": "taskpilot_github",
+      "flow_steps": [
+        {
+          "step_order": 1,
+          "system_tool_fn": "taskpilot_github",
+          "feedback_step": "github_validation",
+          "next_tool": "taskpilot_update"
+        }
+      ]
+    },
+    {
+      "tool_name": "taskpilot_rule_update",
+      "flow_steps": [
+        {
+          "step_order": 1,
+          "system_tool_fn": "taskpilot_rule_update",
+          "feedback_step": null,
+          "next_tool": "end"
+        }
+      ]
+    }
+  ]
+}
