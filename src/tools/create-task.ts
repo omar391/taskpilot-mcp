@@ -97,31 +97,17 @@ export class CreateTaskTool {
           task_title: taskTitle,
           task_description,
           priority,
-          parent_task_id
+            parent_task_id,
+            workspace_name: workspace.name,
+            created_at: new Date().toISOString(),
+            timestamp: new Date().toISOString()
         }
       );
-
-      // Build success response
-      let responseText = `# Task Created Successfully\n\n`;
-      responseText += `**Task ID:** ${taskId}\n`;
-      responseText += `**Title:** ${taskTitle}\n`;
-      responseText += `**Description:** ${task_description}\n`;
-      responseText += `**Priority:** ${priority}\n`;
-      responseText += `**Status:** Backlog\n`;
-      responseText += `**Progress:** 0%\n`;
-      
-      if (parent_task_id) {
-        responseText += `**Parent Task:** ${parent_task_id}\n`;
-      }
-      
-      responseText += `**Workspace:** ${workspace.name}\n`;
-      responseText += `**Created:** ${new Date().toISOString()}\n\n`;
-      responseText += orchestrationResult.prompt_text;
 
       return {
         content: [{
           type: 'text',
-          text: responseText
+            text: orchestrationResult.prompt_text
         }]
       };
     } catch (error) {

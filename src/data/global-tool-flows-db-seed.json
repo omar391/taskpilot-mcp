@@ -39,7 +39,7 @@
         {
           "step_order": 1,
           "system_tool_fn": "taskpilot_create_task",
-          "feedback_step": null,
+          "feedback_step": "task_creation_success",
           "next_tool": "end"
         }
       ]

@@ -16,7 +16,7 @@ export class SeedManager {
    * Load global tool flows from JSON file
    */
   private loadGlobalToolFlows(): any {
-    const flowsPath = join(__dirname, '..', 'data', 'global-tool-flows.json');
+    const flowsPath = join(__dirname, '..', 'data', 'global-tool-flows-db-seed.json');
     const flowsContent = readFileSync(flowsPath, 'utf8');
     return JSON.parse(flowsContent);
   }
@@ -25,7 +25,7 @@ export class SeedManager {
    * Load global feedback steps from JSON file
    */
   private loadGlobalFeedbackSteps(): any {
-    const stepsPath = join(__dirname, '..', 'data', 'global-feedback-steps.json');
+    const stepsPath = join(__dirname, '..', 'data', 'global-feedback-steps-db-seed.json');
     const stepsContent = readFileSync(stepsPath, 'utf8');
     return JSON.parse(stepsContent);
   }

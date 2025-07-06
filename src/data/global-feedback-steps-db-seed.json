@@ -10,7 +10,11 @@
     },
     {
       "name": "status_analysis",
-      "instructions": "Provide comprehensive project status analysis for {{context.workspace_path}}:\n\n1. Summarize tasks by status (Backlog, In-Progress, Blocked, Review, Done)\n2. Identify rule violations and compliance issues\n3. Highlight overdue or blocked tasks with reasons\n4. Calculate progress metrics and velocity trends\n5. Suggest priority adjustments based on dependencies\n6. Recommend next actions for project advancement\n\nPresent findings in a clear, actionable format with specific recommendations."
+      "instructions": "# TaskPilot Status Report for {{context.workspace_name}}\n\n**Workspace:** {{context.workspace_name}}\n**Path:** {{context.workspace_path}}\n**Analysis Time:** {{context.timestamp}}\n\n## Task Distribution\n**Total Tasks:** {{context.task_count}}\n**Average Progress:** {{context.avg_progress}}%\n**Status Breakdown:** {{context.status_breakdown}}\n**Priority Breakdown:** {{context.priority_breakdown}}\n\n## Analysis\n{{context.blocked_count}} blocked tasks require attention.\n{{context.high_priority_count}} high priority tasks need focus.\n\n**Instructions:** Provide comprehensive project status analysis:\n1. Summarize tasks by status (Backlog, In-Progress, Blocked, Review, Done)\n2. Identify rule violations and compliance issues\n3. Highlight overdue or blocked tasks with reasons\n4. Calculate progress metrics and velocity trends\n5. Suggest priority adjustments based on dependencies\n6. Recommend next actions for project advancement\n\nPresent findings in a clear, actionable format with specific recommendations."
+    },
+    {
+      "name": "task_creation_success",
+      "instructions": "# Task Created Successfully\n\n**Task ID:** {{context.task_id}}\n**Title:** {{context.task_title}}\n**Description:** {{context.task_description}}\n**Priority:** {{context.priority}}\n**Status:** Backlog\n**Progress:** 0%\n{{context.parent_task_id ? '**Parent Task:** ' + context.parent_task_id + '\\n' : ''}}**Workspace:** {{context.workspace_name}}\n**Created:** {{context.created_at}}\n\nTask has been successfully created and added to the project backlog. The task is ready for development and can be started using `taskpilot_focus {{context.task_id}}`."
     },
     {
       "name": "audit_analysis",

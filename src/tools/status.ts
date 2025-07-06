@@ -47,7 +47,7 @@ export class StatusTool {
       // Get all tasks for analysis
       const tasks = await this.getTasks(workspace.id);
       
-      // Generate status summary
+        // Generate status summary data for context
       const statusSummary = this.generateStatusSummary(tasks);
       
       // Generate orchestrated prompt using the flow system
@@ -58,91 +58,21 @@ export class StatusTool {
           workspace_path,
           workspace_name: workspace.name,
           task_count: tasks.length,
-          ...statusSummary
+            total_progress: statusSummary.totalProgress,
+            avg_progress: (statusSummary.totalProgress / Math.max(tasks.length, 1)).toFixed(1),
+            status_breakdown: JSON.stringify(statusSummary.byStatus),
+            priority_breakdown: JSON.stringify(statusSummary.byPriority),
+            blocked_count: statusSummary.byStatus.Blocked || 0,
+            high_priority_count: statusSummary.byPriority.High || 0,
+            detailed,
+            timestamp: new Date().toISOString()
         }
       );
-
-      // Build comprehensive status report
-      let statusReport = `# Project Status Report\n\n`;
-      statusReport += `**Workspace:** ${workspace.name}\n`;
-      statusReport += `**Path:** ${workspace_path}\n`;
-      statusReport += `**Last Updated:** ${new Date().toISOString()}\n\n`;
-
-      // Task Summary by Status
-      statusReport += `## Task Summary\n\n`;
-      statusReport += `| Status | Count | Percentage |\n`;
-      statusReport += `|--------|-------|------------|\n`;
-      
-      const totalTasks = tasks.length;
-      Object.entries(statusSummary.byStatus).forEach(([status, count]) => {
-        const percentage = totalTasks > 0 ? ((count / totalTasks) * 100).toFixed(1) : '0.0';
-        statusReport += `| ${status} | ${count} | ${percentage}% |\n`;
-      });
-      statusReport += `| **Total** | **${totalTasks}** | **100.0%** |\n\n`;
-
-      // Priority Breakdown
-      statusReport += `## Priority Breakdown\n\n`;
-      statusReport += `| Priority | Count |\n`;
-      statusReport += `|----------|-------|\n`;
-      Object.entries(statusSummary.byPriority).forEach(([priority, count]) => {
-        statusReport += `| ${priority} | ${count} |\n`;
-      });
-      statusReport += `\n`;
-
-      // Progress Metrics
-      const avgProgress = statusSummary.totalProgress / Math.max(totalTasks, 1);
-      statusReport += `## Progress Metrics\n\n`;
-      statusReport += `- **Average Progress:** ${avgProgress.toFixed(1)}%\n`;
-      statusReport += `- **Completed Tasks:** ${statusSummary.byStatus.Done || 0}\n`;
-      statusReport += `- **Active Tasks:** ${statusSummary.byStatus['In-Progress'] || 0}\n`;
-      statusReport += `- **Blocked Tasks:** ${statusSummary.byStatus.Blocked || 0}\n\n`;
-
-      // Blocked Tasks Alert
-      if (statusSummary.byStatus.Blocked > 0) {
-        const blockedTasks = tasks.filter(t => t.status === 'Blocked');
-        statusReport += `## ⚠️ Blocked Tasks\n\n`;
-        blockedTasks.forEach(task => {
-          statusReport += `- **${task.id}:** ${task.title}\n`;
-          if (task.notes) {
-            statusReport += `  - *Notes:* ${task.notes}\n`;
-          }
-        });
-        statusReport += `\n`;
-      }
-
-      // High Priority Tasks
-      const highPriorityTasks = tasks.filter(t => t.priority === 'High' && t.status !== 'Done');
-      if (highPriorityTasks.length > 0) {
-        statusReport += `## 🔥 High Priority Tasks\n\n`;
-        highPriorityTasks.forEach(task => {
-          statusReport += `- **${task.id}:** ${task.title} (${task.status}, ${task.progress}%)\n`;
-        });
-        statusReport += `\n`;
-      }
-
-      // Recent Activity
-      const recentTasks = tasks
-        .filter(t => t.updated_at)
-        .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-        .slice(0, 5);
-      
-      if (recentTasks.length > 0) {
-        statusReport += `## 📈 Recent Activity\n\n`;
-        recentTasks.forEach(task => {
-          const updatedDate = new Date(task.updated_at).toLocaleDateString();
-          statusReport += `- **${task.id}:** ${task.title} (${task.status}) - Updated ${updatedDate}\n`;
-        });
-        statusReport += `\n`;
-      }
-
-      // Add detailed analysis from orchestration
-      statusReport += `## Analysis & Recommendations\n\n`;
-      statusReport += orchestrationResult.prompt_text;
 
       return {
         content: [{
           type: 'text',
-          text: statusReport
+            text: orchestrationResult.prompt_text
         }]
       };
     } catch (error) {
