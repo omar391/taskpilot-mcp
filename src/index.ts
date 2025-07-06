@@ -27,6 +27,7 @@ import { StartTool, startToolSchema } from './tools/start.js';
 import { InitTool, initToolSchema } from './tools/init.js';
 import { AddTool, addToolSchema } from './tools/add.js';
 import { CreateTaskTool, createTaskToolSchema } from './tools/create-task.js';
+import { StatusTool, statusToolSchema } from './tools/status.js';
 
 /**
  * Create an MCP server with TaskPilot capabilities
@@ -52,6 +53,7 @@ let startTool: StartTool;
 let initTool: InitTool;
 let addTool: AddTool;
 let createTaskTool: CreateTaskTool;
+let statusTool: StatusTool;
 
 /**
  * Initialize server components
@@ -75,6 +77,7 @@ async function initializeServer() {
     initTool = new InitTool(db);
     addTool = new AddTool(db);
     createTaskTool = new CreateTaskTool(db);
+    statusTool = new StatusTool(db);
     
     console.log('TaskPilot MCP server initialized successfully');
   } catch (error) {
@@ -93,6 +96,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       InitTool.getToolDefinition(),
       AddTool.getToolDefinition(),
       CreateTaskTool.getToolDefinition(),
+      StatusTool.getToolDefinition(),
       // Additional tools will be added here as they are implemented
     ]
   };
@@ -136,6 +140,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'taskpilot_create_task': {
         const input = createTaskToolSchema.parse(args);
         const result = await createTaskTool.execute(input);
+        return {
+          content: result.content,
+          isError: result.isError
+        };
+      }
+
+      case 'taskpilot_status': {
+        const input = statusToolSchema.parse(args);
+        const result = await statusTool.execute(input);
         return {
           content: result.content,
           isError: result.isError
