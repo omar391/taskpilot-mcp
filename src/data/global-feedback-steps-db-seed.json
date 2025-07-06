@@ -23,6 +23,14 @@
     {
       "name": "github_validation",
       "instructions": "Validate GitHub integration for {{context.repository_url}}:\n\n1. Verify repository connection and credentials\n2. Check bidirectional sync between tasks and issues\n3. Validate webhook configurations and event handling\n4. Ensure task status updates reflect GitHub changes\n5. Confirm issue creation from tasks is working\n6. Review any sync conflicts or missing data\n\nRecommend corrective actions for any integration issues found."
+    },
+    {
+      "name": "task_focus_context",
+      "instructions": "# Focused on Task: {{context.task_id}}\n\n**Title:** {{context.task_title}}\n**Description:** {{context.task_description}}\n**Priority:** {{context.task_priority}}\n**Status:** {{context.task_status}}\n**Progress:** {{context.task_progress}}%\n{{context.parent_task_id ? '**Parent Task:** ' + context.parent_task_id + '\\n' : ''}}{{context.blocked_by_task ? '**Blocked By:** ' + context.blocked_by_task + '\\n' : ''}}\n**Connected Files:** {{context.connected_files}}\n**Dependencies:** {{context.dependencies_count}} tasks depend on this\n**Subtasks:** {{context.subtasks_count}} subtasks\n\n## Implementation Context\n{{context.notes}}\n\n**Last Updated:** {{context.updated_at}}\n**Workspace:** {{context.workspace_name}}\n\n## Next Steps\nYou are now focused on this task. Use this context to guide your implementation approach. If status was changed to In-Progress, begin working on the requirements. Consider the connected files and dependencies when making changes."
+    },
+    {
+      "name": "task_update_confirmation",
+      "instructions": "# Task Updated Successfully\n\n**Task ID:** {{context.task_id}}\n**Task Title:** {{context.task_title}}\n**Field Updated:** {{context.field_updated}}\n**Previous Value:** {{context.old_value}}\n**New Value:** {{context.new_value}}\n**Reason:** {{context.reason}}\n**Updated At:** {{context.updated_at}}\n\n**Current Status:** {{context.task_status}}\n**Current Progress:** {{context.task_progress}}%\n**Workspace:** {{context.workspace_name}}\n\nThe task has been successfully updated with the new {{context.field_updated}} value. All changes are tracked for audit purposes."
     }
   ]
 }

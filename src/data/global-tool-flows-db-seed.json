@@ -61,7 +61,7 @@
         {
           "step_order": 1,
           "system_tool_fn": "taskpilot_update",
-          "feedback_step": null,
+          "feedback_step": "task_update_confirmation",
           "next_tool": "end"
         }
       ]
@@ -72,7 +72,7 @@
         {
           "step_order": 1,
           "system_tool_fn": "taskpilot_focus",
-          "feedback_step": null,
+          "feedback_step": "task_focus_context",
           "next_tool": "end"
         }
       ]

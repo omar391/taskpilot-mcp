@@ -28,6 +28,8 @@ import { InitTool, initToolSchema } from './tools/init.js';
 import { AddTool, addToolSchema } from './tools/add.js';
 import { CreateTaskTool, createTaskToolSchema } from './tools/create-task.js';
 import { StatusTool, statusToolSchema } from './tools/status.js';
+import { UpdateTool, updateToolSchema } from './tools/update.js';
+import { FocusTool, focusToolSchema } from './tools/focus.js';
 
 /**
  * Create an MCP server with TaskPilot capabilities
@@ -54,6 +56,8 @@ let initTool: InitTool;
 let addTool: AddTool;
 let createTaskTool: CreateTaskTool;
 let statusTool: StatusTool;
+let updateTool: UpdateTool;
+let focusTool: FocusTool;
 
 /**
  * Initialize server components
@@ -78,6 +82,8 @@ async function initializeServer() {
     addTool = new AddTool(db);
     createTaskTool = new CreateTaskTool(db);
     statusTool = new StatusTool(db);
+    updateTool = new UpdateTool(db);
+    focusTool = new FocusTool(db);
     
     console.log('TaskPilot MCP server initialized successfully');
   } catch (error) {
@@ -97,6 +103,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       AddTool.getToolDefinition(),
       CreateTaskTool.getToolDefinition(),
       StatusTool.getToolDefinition(),
+      UpdateTool.getToolDefinition(),
+      FocusTool.getToolDefinition(),
       // Additional tools will be added here as they are implemented
     ]
   };
@@ -149,6 +157,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'taskpilot_status': {
         const input = statusToolSchema.parse(args);
         const result = await statusTool.execute(input);
+        return {
+          content: result.content,
+          isError: result.isError
+        };
+      }
+
+      case 'taskpilot_update': {
+        const input = updateToolSchema.parse(args);
+        const result = await updateTool.execute(input);
+        return {
+          content: result.content,
+          isError: result.isError
+        };
+      }
+
+      case 'taskpilot_focus': {
+        const input = focusToolSchema.parse(args);
+        const result = await focusTool.execute(input);
         return {
           content: result.content,
           isError: result.isError
