@@ -29,17 +29,17 @@ This is a TypeScript-based MCP server that implements a simple notes system. It 
 
 Install dependencies:
 ```bash
-npm install
+bun install
 ```
 
 Build the server:
 ```bash
-npm run build
+bun run build
 ```
 
 For development with auto-rebuild:
 ```bash
-npm run watch
+bun run watch
 ```
 
 ## Installation
@@ -64,7 +64,7 @@ On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
 Since MCP servers communicate over stdio, debugging can be challenging. We recommend using the [MCP Inspector](https://github.com/modelcontextprotocol/inspector), which is available as a package script:
 
 ```bash
-npm run inspector
+bun run inspector
 ```
 
 The Inspector will provide a URL to access debugging tools in your browser.

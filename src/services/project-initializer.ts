@@ -138,13 +138,13 @@ export class ProjectInitializer {
       {
         id: this.generateTaskId(),
         title: 'Project Setup and Configuration',
-        description: `Set up initial project structure and configuration for ${techStack} development environment. Includes package management, build tools, and development dependencies setup.`,
+        description: `Set up initial project structure and configuration for ${techStack} development environment. Includes package management with bun, build tools, and development dependencies setup.`,
         priority: 'High',
         status: 'Backlog',
         progress: 0,
         workspace_id: workspaceId,
-        connected_files: JSON.stringify(['package.json', 'tsconfig.json', '.gitignore', 'README.md']),
-        notes: 'Foundation task for project initialization'
+        connected_files: JSON.stringify(['package.json', 'bun.lockb', 'tsconfig.json', '.gitignore', 'README.md']),
+        notes: 'Foundation task for project initialization - use bun for package management'
       },
       {
         id: this.generateTaskId(),
@@ -251,6 +251,13 @@ export class ProjectInitializer {
 - All code must pass linting and formatting checks
 - Use TypeScript strict mode for type safety
 - Document complex algorithms and business logic
+
+## Package Management
+- **Always use bun instead of npm where possible** for faster performance
+- Use \`bun install\` instead of \`npm install\`
+- Use \`bun run\` instead of \`npm run\` for scripts
+- Use \`bun add\` instead of \`npm install <package>\`
+- Only fallback to npm if bun compatibility issues arise
 
 `;
 
