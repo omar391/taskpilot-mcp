@@ -24,6 +24,7 @@ import { PromptOrchestrator } from './services/prompt-orchestrator.js';
 
 // Tools
 import { StartTool, startToolSchema } from './tools/start.js';
+import { InitTool, initToolSchema } from './tools/init.js';
 
 /**
  * Create an MCP server with TaskPilot capabilities
@@ -46,6 +47,7 @@ let db: any;
 let seedManager: SeedManager;
 let orchestrator: PromptOrchestrator;
 let startTool: StartTool;
+let initTool: InitTool;
 
 /**
  * Initialize server components
@@ -66,6 +68,7 @@ async function initializeServer() {
 
     // Initialize tools
     startTool = new StartTool(db);
+    initTool = new InitTool(db);
     
     console.log('TaskPilot MCP server initialized successfully');
   } catch (error) {
@@ -81,6 +84,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       StartTool.getToolDefinition(),
+      InitTool.getToolDefinition(),
       // Additional tools will be added here as they are implemented
     ]
   };
@@ -97,6 +101,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'taskpilot_start': {
         const input = startToolSchema.parse(args);
         const result = await startTool.execute(input);
+        return {
+          content: result.content,
+          isError: result.isError
+        };
+      }
+
+      case 'taskpilot_init': {
+        const input = initToolSchema.parse(args);
+        const result = await initTool.execute(input);
         return {
           content: result.content,
           isError: result.isError

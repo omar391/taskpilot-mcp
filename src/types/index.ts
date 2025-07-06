@@ -9,6 +9,7 @@ export interface Task {
   blocked_by_task_id?: string;
   connected_files: string[];
   notes?: string;
+  workspace_id: string;
   created_at: string;
   updated_at: string;
   completed_at?: string;

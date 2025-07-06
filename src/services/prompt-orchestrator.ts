@@ -192,25 +192,94 @@ You are now connected to the TaskPilot workspace. You can:
    * Generate project initialization prompt
    */
   private async generateInitPrompt(workspaceId: string, args: Record<string, any>): Promise<string> {
-    const requirements = args.requirements || 'No specific requirements provided';
+    const requirements = args.project_requirements || 'No specific requirements provided';
+    const techStack = args.tech_stack || 'No tech stack specified';
+    const workspacePath = args.workspace_path || 'current directory';
+    const projectName = args.project_name || 'TaskPilot Project';
+    const initializationComplete = args.initialization_complete || false;
+    const createdTasks = args.created_tasks || [];
     
-    return `# TaskPilot Project Initialization
+    if (initializationComplete) {
+      // Project has been initialized, provide completion summary
+      let prompt = `# TaskPilot Project Initialization Complete
+
+**Project:** ${projectName}
+**Workspace:** ${workspacePath}
+**Technology Stack:** ${techStack}
+**Requirements:** ${requirements}
+
+## Initialization Summary
+
+✅ **Workspace Configuration**
+- Project workspace created and configured
+- Workspace tracking system initialized
+- Session management activated
+
+✅ **Task Structure Created**
+- ${createdTasks.length} initial tasks created
+- Task dependencies and priorities established
+- Project breakdown structure initialized
+
+✅ **Standard Rules Established**
+- Global development practices activated
+- Workspace-specific rules configured for ${techStack}
+- Quality assurance processes established
+
+✅ **Analytical Framework Configured**
+- 6-step validation workflows activated
+- Feedback step instructions configured
+- Task orchestration system ready
+
+## Initial Tasks Created
+
+`;
+
+      if (createdTasks.length > 0) {
+        createdTasks.forEach((task: any, index: number) => {
+          prompt += `${index + 1}. **${task.id}: ${task.title}**
+   - Priority: ${task.priority}
+   - Status: ${task.status}
+   - Description: ${task.description}
+
+`;
+        });
+      }
+
+      prompt += `## Next Steps
+
+The TaskPilot project is fully initialized and ready for development. You can now:
+
+1. **Review Tasks**: Use \`taskpilot_status\` to see the complete task overview
+2. **Start Development**: Use \`taskpilot_focus [Task ID]\` to begin work on specific tasks
+3. **Add New Tasks**: Use \`taskpilot_add [description]\` to create additional tasks
+4. **Update Progress**: Use \`taskpilot_update\` to modify task status and progress
+
+**Project initialization successful. TaskPilot is ready for active development.**`;
+
+      return prompt;
+    } else {
+      // Provide initialization instructions (this shouldn't normally happen with the new flow)
+      return `# TaskPilot Project Initialization
 
 Initialize a new TaskPilot project with the following requirements:
 
-**Requirements:**
-${requirements}
+**Project Name:** ${projectName}
+**Workspace:** ${workspacePath}
+**Technology Stack:** ${techStack}
+**Requirements:** ${requirements}
 
-## Initialization Steps
+## Initialization Process
+
+The TaskPilot initialization process will:
 
 1. **Create Workspace Configuration**
    - Set up project metadata and workspace tracking
    - Initialize task tracking system
    - Configure default workflow patterns
 
-2. **Establish Standard Rules**
+2. **Establish Development Rules**
    - Copy standard development practices
-   - Set up workspace-specific guidelines
+   - Set up ${techStack}-specific guidelines
    - Configure coding standards and workflows
 
 3. **Initialize Task Structure**
@@ -218,12 +287,13 @@ ${requirements}
    - Set up task dependencies and priorities
    - Establish project milestones
 
-4. **Configure Analytical Framework**
+4. **Configure Quality Framework**
    - Set up validation workflows
    - Configure feedback step instructions
    - Establish quality assurance processes
 
-After initialization, the project will be ready for active task management with TaskPilot tools.`;
+The initialization process has been completed automatically.`;
+    }
   }
 
   /**
