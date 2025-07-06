@@ -30,6 +30,10 @@ import { CreateTaskTool, createTaskToolSchema } from './tools/create-task.js';
 import { StatusTool, statusToolSchema } from './tools/status.js';
 import { UpdateTool, updateToolSchema } from './tools/update.js';
 import { FocusTool, focusToolSchema } from './tools/focus.js';
+import { AuditTool, auditToolSchema } from './tools/audit.js';
+import { GitHubTool, githubToolSchema } from './tools/github.js';
+import { RuleUpdateTool, ruleUpdateToolSchema } from './tools/rule-update.js';
+import { RemoteInterfaceTool, remoteInterfaceToolSchema } from './tools/remote-interface.js';
 
 /**
  * Create an MCP server with TaskPilot capabilities
@@ -58,6 +62,10 @@ let createTaskTool: CreateTaskTool;
 let statusTool: StatusTool;
 let updateTool: UpdateTool;
 let focusTool: FocusTool;
+let auditTool: AuditTool;
+let githubTool: GitHubTool;
+let ruleUpdateTool: RuleUpdateTool;
+let remoteInterfaceTool: RemoteInterfaceTool;
 
 /**
  * Initialize server components
@@ -84,6 +92,10 @@ async function initializeServer() {
     statusTool = new StatusTool(db);
     updateTool = new UpdateTool(db);
     focusTool = new FocusTool(db);
+    auditTool = new AuditTool(db);
+    githubTool = new GitHubTool(db);
+    ruleUpdateTool = new RuleUpdateTool(db);
+    remoteInterfaceTool = new RemoteInterfaceTool(db);
     
     console.log('TaskPilot MCP server initialized successfully');
   } catch (error) {
@@ -105,6 +117,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       StatusTool.getToolDefinition(),
       UpdateTool.getToolDefinition(),
       FocusTool.getToolDefinition(),
+      AuditTool.getToolDefinition(),
+      GitHubTool.getToolDefinition(),
+      RuleUpdateTool.getToolDefinition(),
+      RemoteInterfaceTool.getToolDefinition(),
       // Additional tools will be added here as they are implemented
     ]
   };
@@ -175,6 +191,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'taskpilot_focus': {
         const input = focusToolSchema.parse(args);
         const result = await focusTool.execute(input);
+        return {
+          content: result.content,
+          isError: result.isError
+        };
+      }
+
+      case 'taskpilot_audit': {
+        const input = auditToolSchema.parse(args);
+        const result = await auditTool.execute(input);
+        return {
+          content: result.content,
+          isError: result.isError
+        };
+      }
+
+      case 'taskpilot_github': {
+        const input = githubToolSchema.parse(args);
+        const result = await githubTool.execute(input);
+        return {
+          content: result.content,
+          isError: result.isError
+        };
+      }
+
+      case 'taskpilot_rule_update': {
+        const input = ruleUpdateToolSchema.parse(args);
+        const result = await ruleUpdateTool.execute(input);
+        return {
+          content: result.content,
+          isError: result.isError
+        };
+      }
+
+      case 'taskpilot_remote_interface': {
+        const input = remoteInterfaceToolSchema.parse(args);
+        const result = await remoteInterfaceTool.execute(input);
         return {
           content: result.content,
           isError: result.isError

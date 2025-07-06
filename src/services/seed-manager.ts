@@ -31,17 +31,28 @@ export class SeedManager {
   }
 
   /**
+   * Load MCP server mappings from JSON file
+   */
+  private loadMCPServerMappings(): any {
+    const mappingsPath = join(__dirname, '..', 'data', 'mcp-server-mappings-seed.json');
+    const mappingsContent = readFileSync(mappingsPath, 'utf8');
+    return JSON.parse(mappingsContent);
+  }
+
+  /**
    * Initialize global tool flows and feedback steps in database
    */
   async initializeGlobalData(): Promise<void> {
     const toolFlowsData = this.loadGlobalToolFlows();
     const feedbackStepsData = this.loadGlobalFeedbackSteps();
+    const mcpMappingsData = this.loadMCPServerMappings();
 
     try {
       await this.db.transaction([
         // Clear existing global data
         { sql: 'DELETE FROM tool_flows WHERE workspace_id IS NULL' },
         { sql: 'DELETE FROM feedback_steps WHERE workspace_id IS NULL' },
+        { sql: 'DELETE FROM mcp_server_mappings' },
         
         // Insert global feedback steps
         ...feedbackStepsData.global_feedback_steps.map((step: any) => ({
@@ -76,7 +87,21 @@ export class SeedManager {
               step.next_tool || null
             ]
           }))
-        ])
+        ]),
+
+        // Insert MCP server mappings
+        ...mcpMappingsData.map((mapping: any) => ({
+          sql: `INSERT INTO mcp_server_mappings 
+                (id, interface_type, mcp_server_name, description, is_default, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          params: [
+            mapping.id,
+            mapping.interface_type,
+            mapping.mcp_server_name,
+            mapping.description,
+            mapping.is_default
+          ]
+        }))
       ]);
 
       console.log('Global seed data initialized successfully');

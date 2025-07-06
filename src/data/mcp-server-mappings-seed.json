@@ -1,0 +1,44 @@
+[
+  {
+    "id": "msm_github_001",
+    "interface_type": "github",
+    "mcp_server_name": "github-mcp",
+    "description": "GitHub MCP Server for repository and issue management",
+    "is_default": true
+  },
+  {
+    "id": "msm_jira_001", 
+    "interface_type": "jira",
+    "mcp_server_name": "jira-mcp",
+    "description": "Jira MCP Server for project and issue tracking",
+    "is_default": true
+  },
+  {
+    "id": "msm_linear_001",
+    "interface_type": "linear", 
+    "mcp_server_name": "linear-mcp",
+    "description": "Linear MCP Server for team issue tracking",
+    "is_default": true
+  },
+  {
+    "id": "msm_asana_001",
+    "interface_type": "asana",
+    "mcp_server_name": "asana-mcp", 
+    "description": "Asana MCP Server for project management",
+    "is_default": true
+  },
+  {
+    "id": "msm_trello_001",
+    "interface_type": "trello",
+    "mcp_server_name": "trello-mcp",
+    "description": "Trello MCP Server for board management",
+    "is_default": true
+  },
+  {
+    "id": "msm_custom_001",
+    "interface_type": "custom",
+    "mcp_server_name": "custom-rest-mcp",
+    "description": "Generic REST API MCP Server for custom integrations",
+    "is_default": true
+  }
+]
