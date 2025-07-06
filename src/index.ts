@@ -25,6 +25,8 @@ import { PromptOrchestrator } from './services/prompt-orchestrator.js';
 // Tools
 import { StartTool, startToolSchema } from './tools/start.js';
 import { InitTool, initToolSchema } from './tools/init.js';
+import { AddTool, addToolSchema } from './tools/add.js';
+import { CreateTaskTool, createTaskToolSchema } from './tools/create-task.js';
 
 /**
  * Create an MCP server with TaskPilot capabilities
@@ -48,6 +50,8 @@ let seedManager: SeedManager;
 let orchestrator: PromptOrchestrator;
 let startTool: StartTool;
 let initTool: InitTool;
+let addTool: AddTool;
+let createTaskTool: CreateTaskTool;
 
 /**
  * Initialize server components
@@ -69,6 +73,8 @@ async function initializeServer() {
     // Initialize tools
     startTool = new StartTool(db);
     initTool = new InitTool(db);
+    addTool = new AddTool(db);
+    createTaskTool = new CreateTaskTool(db);
     
     console.log('TaskPilot MCP server initialized successfully');
   } catch (error) {
@@ -85,6 +91,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       StartTool.getToolDefinition(),
       InitTool.getToolDefinition(),
+      AddTool.getToolDefinition(),
+      CreateTaskTool.getToolDefinition(),
       // Additional tools will be added here as they are implemented
     ]
   };
@@ -110,6 +118,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'taskpilot_init': {
         const input = initToolSchema.parse(args);
         const result = await initTool.execute(input);
+        return {
+          content: result.content,
+          isError: result.isError
+        };
+      }
+
+      case 'taskpilot_add': {
+        const input = addToolSchema.parse(args);
+        const result = await addTool.execute(input);
+        return {
+          content: result.content,
+          isError: result.isError
+        };
+      }
+
+      case 'taskpilot_create_task': {
+        const input = createTaskToolSchema.parse(args);
+        const result = await createTaskTool.execute(input);
         return {
           content: result.content,
           isError: result.isError
