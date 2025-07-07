@@ -27,6 +27,7 @@ import { DatabaseService } from './services/database-service.js';
 import { SeedManager } from './services/seed-manager.js';
 import { PromptOrchestrator } from './services/prompt-orchestrator.js';
 import { createApiRouter, SSEEventManager } from './api/router.js';
+import { WorkspaceRegistry } from './services/workspace-registry.js';
 
 // Tools
 import { StartTool, startToolSchema } from './tools/start.js';
@@ -63,6 +64,7 @@ function createMCPServer() {
 let databaseService: DatabaseService;
 let seedManager: SeedManager;
 let orchestrator: PromptOrchestrator;
+let workspaceRegistry: WorkspaceRegistry;
 let startTool: StartTool;
 let initTool: InitTool;
 let addTool: AddTool;
@@ -80,8 +82,22 @@ let activeServers: Server[] = [];
 let sseEventManager: SSEEventManager;
 
 /**
- * Initialize server components
+ * Helper function to register workspace activity when tools are executed
  */
+async function updateWorkspaceActivity(workspacePath: string): Promise<void> {
+  if (workspaceRegistry && workspacePath) {
+    try {
+      await workspaceRegistry.updateWorkspaceActivityByPath(workspacePath);
+    } catch (error) {
+      // Silently register if not found
+      try {
+        await workspaceRegistry.registerWorkspace(workspacePath);
+      } catch (registerError) {
+        console.warn('Failed to register workspace:', registerError);
+      }
+    }
+  }
+}
 async function initializeServer() {
   try {
     // Initialize global database and create database service
@@ -93,6 +109,15 @@ async function initializeServer() {
     seedManager = new SeedManager(globalDb); // SeedManager only needs global DB
     orchestrator = new PromptOrchestrator(globalDb); // PromptOrchestrator only needs global DB
     
+    // Initialize workspace registry
+    workspaceRegistry = new WorkspaceRegistry(globalDb, {
+      scanPaths: [], // Will be configured via environment or config
+      autoRegister: false, // Manual registration for now
+      activityTimeoutMs: 5 * 60 * 1000, // 5 minutes
+      cleanupIntervalMs: 60 * 1000 // 1 minute
+    });
+    await workspaceRegistry.start();
+    
     // Initialize SSE event manager
     sseEventManager = new SSEEventManager();
     
@@ -100,7 +125,7 @@ async function initializeServer() {
     await seedManager.initializeGlobalData();
     console.log('Global seed data loaded successfully');
 
-    // Initialize tools with database service (they'll need to be updated to use it)
+    // Initialize tools with database service and workspace registry
     // For now, pass globalDb to maintain compatibility
     startTool = new StartTool(globalDb);
     initTool = new InitTool(globalDb);
@@ -157,6 +182,7 @@ function configureServerHandlers(server: Server) {
       switch (name) {
         case 'taskpilot_start': {
           const input = startToolSchema.parse(args);
+          await updateWorkspaceActivity(input.workspace_path);
           const result = await startTool.execute(input);
           return {
             content: result.content,
@@ -166,6 +192,7 @@ function configureServerHandlers(server: Server) {
 
         case 'taskpilot_init': {
           const input = initToolSchema.parse(args);
+          await updateWorkspaceActivity(input.workspace_path);
           const result = await initTool.execute(input);
           return {
             content: result.content,
@@ -175,6 +202,7 @@ function configureServerHandlers(server: Server) {
 
         case 'taskpilot_add': {
           const input = addToolSchema.parse(args);
+          await updateWorkspaceActivity(input.workspace_path);
           const result = await addTool.execute(input);
           return {
             content: result.content,
@@ -184,6 +212,7 @@ function configureServerHandlers(server: Server) {
 
         case 'taskpilot_create_task': {
           const input = createTaskToolSchema.parse(args);
+          await updateWorkspaceActivity(input.workspace_path);
           const result = await createTaskTool.execute(input);
           return {
             content: result.content,
@@ -193,6 +222,7 @@ function configureServerHandlers(server: Server) {
 
         case 'taskpilot_status': {
           const input = statusToolSchema.parse(args);
+          await updateWorkspaceActivity(input.workspace_path);
           const result = await statusTool.execute(input);
           return {
             content: result.content,
@@ -202,6 +232,7 @@ function configureServerHandlers(server: Server) {
 
         case 'taskpilot_update': {
           const input = updateToolSchema.parse(args);
+          await updateWorkspaceActivity(input.workspace_path);
           const result = await updateTool.execute(input);
           return {
             content: result.content,
@@ -211,6 +242,7 @@ function configureServerHandlers(server: Server) {
 
         case 'taskpilot_focus': {
           const input = focusToolSchema.parse(args);
+          await updateWorkspaceActivity(input.workspace_path);
           const result = await focusTool.execute(input);
           return {
             content: result.content,
@@ -220,6 +252,7 @@ function configureServerHandlers(server: Server) {
 
         case 'taskpilot_audit': {
           const input = auditToolSchema.parse(args);
+          await updateWorkspaceActivity(input.workspace_path);
           const result = await auditTool.execute(input);
           return {
             content: result.content,
@@ -229,6 +262,8 @@ function configureServerHandlers(server: Server) {
 
         case 'taskpilot_github': {
           const input = githubToolSchema.parse(args);
+          // GitHub tool uses workspace_id, need to convert to workspace_path
+          // For now, skip activity tracking for GitHub tool since it doesn't have workspace_path
           const result = await githubTool.execute(input);
           return {
             content: result.content,
@@ -238,6 +273,7 @@ function configureServerHandlers(server: Server) {
 
         case 'taskpilot_rule_update': {
           const input = ruleUpdateToolSchema.parse(args);
+          // Rule update tool uses workspace_id, skip activity tracking for now
           const result = await ruleUpdateTool.execute(input);
           return {
             content: result.content,
@@ -247,6 +283,7 @@ function configureServerHandlers(server: Server) {
 
         case 'taskpilot_remote_interface': {
           const input = remoteInterfaceToolSchema.parse(args);
+          // Remote interface tool uses workspace_id, skip activity tracking for now
           const result = await remoteInterfaceTool.execute(input);
           return {
             content: result.content,
@@ -522,6 +559,9 @@ async function main() {
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
   console.error('Shutting down TaskPilot MCP server...');
+  if (workspaceRegistry) {
+    workspaceRegistry.stop();
+  }
   if (databaseService) {
     await databaseService.close();
   }
@@ -530,6 +570,9 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
   console.error('Shutting down TaskPilot MCP server...');
+  if (workspaceRegistry) {
+    workspaceRegistry.stop();
+  }
   if (databaseService) {
     await databaseService.close();
   }

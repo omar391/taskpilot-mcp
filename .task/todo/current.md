@@ -121,21 +121,6 @@
 - **Notes**: ✅ COMPLETED - Composite feedback step successfully provides comprehensive workspace context with global rules, analytical framework, and workspace-specific rules to LLM on start/init
 - **Connected File List**: src/data/global-tool-flows-db-seed.json, src/data/global-feedback-steps-db-seed.json, src/tools/start.ts, src/tools/init.ts, src/database/schema.sql, src/database/connection.ts
 
-## Task TP-031: Implement Global Workspace Registry
-- **Title**: Create workspace discovery and management system
-- **Description**:
-  - Design global database schema for workspace registry and metadata
-  - Implement automatic workspace scanning and registration service
-  - Create workspace lifecycle management (active/inactive/error status)
-  - Add workspace metadata storage (name, path, last activity, task counts)
-  - Enable UI to discover and display workspaces without requiring MCP tool calls
-- **Priority**: High
-- **Dependencies**: TP-026
-- **Status**: Backlog
-- **Progress**: 0%
-- **Notes**: Enables UI workspace discovery independent of LLM sessions
-- **Connected File List**: src/services/workspace-registry.ts, src/database/global-schema.sql
-
 ## Task TP-032: Update UI with Real API Integration
 - **Title**: Replace mock data with actual API calls and real-time updates
 - **Description**:
