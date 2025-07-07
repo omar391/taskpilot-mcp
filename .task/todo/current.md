@@ -191,9 +191,18 @@
   - Update architecture.md with Phase 3 remote hosting patterns
 - **Priority**: Low
 - **Dependencies**: None
-- **Status**: Backlog
-- **Progress**: 0%
-- **Notes**: Capture confirmed architectural decisions from brainstorming session
+- **Status**: Done
+- **Progress**: 100%
+- **Notes**: ✅ COMPLETED - Phase 3 architecture decisions comprehensively documented:
+  - Added Phase 3 Architecture Decisions section to architecture.md with all 7 key decisions
+  - Documented composite feedback step approach (Option A) with benefits and rejected alternatives
+  - Documented workspace lifecycle timing: Active → Idle (5min) → Inactive (5min)
+  - Documented SSE+REST hybrid communication pattern with event types
+  - Documented dual database architecture: ~/.taskpilot/global.db + {workspace}/.taskpilot/task.db
+  - Documented minimal API strategy with 6 core endpoints
+  - Documented Drizzle ORM integration and embedded data distribution approaches
+  - Updated project.md with Phase 3 completion status and key technical decisions
+  - Complete architectural documentation for production-ready remote hosting system
 - **Connected File List**: .task/architecture.md, .task/project.md
 
 ---

@@ -1,5 +1,115 @@
 # TaskPilot MCP Server Architecture
 
+## Phase 3: Remote Hosting & UI Integration Architecture Decisions
+
+### Overview
+
+This document captures the confirmed architectural decisions made during Phase 3 development for remote hosting and UI integration capabilities. These decisions represent the current production architecture after extensive implementation and testing.
+
+### 1. Composite Feedback Step Approach (Option A)
+
+**Decision**: Use single composite feedback step for multiple rule contexts instead of separate feedback steps.
+
+**Implementation**:
+- Single "workspace_context" feedback step for start/init tools
+- Variable substitution combines: standard rules + workspace rules + analytical framework
+- LLM receives comprehensive context in one response
+
+**Alternative Rejected**: Separate feedback steps for each rule type (would require multiple LLM calls)
+
+**Benefits**: Single context delivery, reduced API calls, comprehensive rule awareness, improved LLM context understanding.
+
+### 2. Workspace Lifecycle Management 
+
+**Decision**: Implement automatic workspace lifecycle with timing-based status transitions.
+
+**Lifecycle States**:
+- **Active**: Recent interaction (MCP call, API request, or UI activity)
+- **Idle**: No activity for 5 minutes → automatic transition
+- **Inactive**: Idle for additional 5 minutes → automatic transition
+
+**Activity Tracking**:
+- MCP tool executions
+- REST API requests  
+- Task updates
+- UI interactions
+
+**Benefits**: Automatic resource management, clear status indication, performance optimization.
+
+### 3. SSE+REST Hybrid Communication Pattern
+
+**Decision**: Use Server-Sent Events (SSE) for real-time updates combined with REST API for commands.
+
+**Architecture**:
+- **REST Endpoints**: HTTP commands from UI to backend
+- **SSE Stream**: Real-time events from backend to UI
+- **Dual Protocol Support**: MCP over SSE + REST API on same port (3001)
+
+**SSE Event Types**:
+- `workspace.status_changed` - Workspace lifecycle updates
+- `task.updated` - Task progress changes
+- `task.created` - New task notifications
+
+**Benefits**: Real-time UI updates, efficient server-to-client communication, proper separation of concerns.
+
+### 4. Database Locations
+
+**Decision**: Split data across two database locations for proper scoping and performance.
+
+**Database Architecture**:
+- **Global Database**: `~/.taskpilot/global.db`
+  - Workspaces registry and metadata
+  - Session management
+  - Global tool flows and feedback steps
+  - MCP server mappings
+  - Cross-workspace shared data
+
+- **Workspace Database**: `{workspace}/.taskpilot/task.db` (per workspace)
+  - Task management and tracking
+  - GitHub configurations  
+  - Remote interface settings
+  - Workspace-specific data
+  - On-demand initialization when workspace accessed
+
+**Benefits**: Clear data separation, improved performance, proper workspace isolation, reduced database contention.
+
+### 5. Minimal API Endpoint Strategy
+
+**Decision**: Design minimal core endpoints with on-demand expansion during UI development.
+
+**Core 6 REST Endpoints**:
+1. `GET /api/workspaces` - List all discovered workspaces
+2. `GET /api/workspaces/{id}/tasks` - Get workspace tasks  
+3. `GET /api/workspaces/{id}/tool-flows` - Get workspace tool flows
+4. `GET /api/workspaces/{id}/feedback-steps` - Get workspace feedback steps
+5. `POST /api/workspaces/{id}/tasks` - Create new task
+6. `PUT /api/workspaces/{id}/tasks/{taskId}` - Update task
+
+**Benefits**: Prevents endpoint bloat, focused API surface, extensible design, real-time capabilities.
+
+### 6. Drizzle ORM Integration
+
+**Decision**: Replace manual SQL with Drizzle ORM for type safety and developer experience.
+
+**Implementation**:
+- TypeScript schema definitions for compile-time safety
+- Automatic type inference for queries and results
+- Migration system with SQL fallback for development
+- Dual database support (global + workspace)
+
+**Benefits**: Type safety, better IDE support, reduced SQL errors, improved maintainability.
+
+### 7. Embedded Data Distribution
+
+**Decision**: Embed all external data files as TypeScript constants for clean distribution.
+
+**Implementation**:
+- All JSON seed data embedded in `src/data/embedded-seed-data.ts`
+- Database schemas embedded via Drizzle TypeScript definitions  
+- No external file dependencies in distribution package
+
+**Benefits**: Single-file distribution, no missing file errors, simplified deployment.
+
 ## System Architecture Overview - Prompt Orchestration Flow
 
 ```mermaid
