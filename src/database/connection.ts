@@ -36,6 +36,7 @@ export class DatabaseManager {
       const runAsync = promisify(this.db.run.bind(this.db));
       const allAsync = promisify(this.db.all.bind(this.db));
       const getAsync = promisify(this.db.get.bind(this.db));
+      const execAsync = promisify(this.db.exec.bind(this.db));
 
       // Store promisified methods
       (this.db as any).runAsync = runAsync;
@@ -49,8 +50,8 @@ export class DatabaseManager {
       const schemaPath = join(__dirname, 'schema.sql');
       const schema = readFileSync(schemaPath, 'utf8');
       
-      // Execute schema as a single script to handle triggers properly
-      await runAsync(schema);
+      // Execute schema using exec which handles multi-statement scripts better
+      await execAsync(schema);
 
       this.isInitialized = true;
       console.log('Database initialized successfully');

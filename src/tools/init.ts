@@ -46,15 +46,21 @@ export class InitTool {
         project_name: project_name || this.extractProjectNameFromPath(workspace_path)
       });
 
-      // Generate orchestrated prompt with initialization context
+      // Get workspace rules after initialization
+      const workspaceRules = await this.getWorkspaceRules(initResult.workspace.id);
+
+      // Generate orchestrated prompt with comprehensive context
       const orchestrationResult = await this.orchestrator.orchestratePrompt(
         'taskpilot_init',
         initResult.workspace.id,
         {
+          workspace_name: initResult.workspace.name,
           workspace_path,
+          session_id: `init-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          workspace_rules: workspaceRules,
           project_requirements,
           tech_stack,
-          project_name,
           initialization_complete: true,
           created_tasks: initResult.initialTasks
         }
@@ -75,6 +81,23 @@ export class InitTool {
         }],
         isError: true
       };
+    }
+  }
+
+  /**
+   * Get workspace-specific rules from feedback steps
+   */
+  private async getWorkspaceRules(workspaceId: string): Promise<string | null> {
+    try {
+      const workspaceRulesStep = await this.db.get<any>(
+        'SELECT instructions FROM feedback_steps WHERE name = ? AND workspace_id = ?',
+        ['workspace_rules', workspaceId]
+      );
+      
+      return workspaceRulesStep?.instructions || null;
+    } catch (error) {
+      console.error('Error fetching workspace rules:', error);
+      return null;
     }
   }
 

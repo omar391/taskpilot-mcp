@@ -38,11 +38,20 @@ export class StartTool {
       // Create new session
       const session = await this.createSession(workspace.id);
       
-      // Generate orchestrated prompt
+      // Get workspace rules if they exist
+      const workspaceRules = await this.getWorkspaceRules(workspace.id);
+      
+      // Generate orchestrated prompt with comprehensive context
       const orchestrationResult = await this.orchestrator.orchestratePrompt(
         'taskpilot_start',
         workspace.id,
-        { workspace_path }
+        {
+          workspace_name: workspace.name,
+          workspace_path: workspace_path,
+          session_id: session.id,
+          timestamp: new Date().toISOString(),
+          workspace_rules: workspaceRules
+        }
       );
 
       // Update workspace activity
@@ -124,6 +133,23 @@ export class StartTool {
       'SELECT * FROM sessions WHERE id = ?',
       [sessionId]
     );
+  }
+
+  /**
+   * Get workspace-specific rules from feedback steps
+   */
+  private async getWorkspaceRules(workspaceId: string): Promise<string | null> {
+    try {
+      const workspaceRulesStep = await this.db.get<any>(
+        'SELECT instructions FROM feedback_steps WHERE name = ? AND workspace_id = ?',
+        ['workspace_rules', workspaceId]
+      );
+      
+      return workspaceRulesStep?.instructions || null;
+    } catch (error) {
+      console.error('Error fetching workspace rules:', error);
+      return null;
+    }
   }
 
   /**

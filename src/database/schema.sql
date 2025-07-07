@@ -1,32 +1,7 @@
 -- TaskPilot MCP Server Database Schema
--- SQLite3 database for task management and prompt-- Remote interfaces table - stores connections to external task management systems
-CREATE TABLE IF NOT EXISTS remote_interfaces (
-  id TEXT PRIMARY KEY,
-  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  interface_type TEXT NOT NULL CHECK(interface_type IN ('github', 'jira', 'linear', 'asana', 'trello', 'custom')),
-  name TEXT NOT NULL,
-  base_url TEXT NOT NULL,
-  api_token TEXT NOT NULL,
-  project_id TEXT, -- Platform-specific project identifier
-  sync_enabled BOOLEAN DEFAULT 1,
-  sync_direction TEXT CHECK(sync_direction IN ('bidirectional', 'import_only', 'export_only')) DEFAULT 'bidirectional',
-  field_mappings TEXT NOT NULL DEFAULT '[]', -- JSON array of field mappings
-  mcp_server_name TEXT, -- Name of the specialized MCP server to delegate operations to
-  last_sync DATETIME,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+-- SQLite3 database for task management and prompt orchestration
 
--- MCP server mappings table - predefined mappings of interface types to MCP server names
-CREATE TABLE IF NOT EXISTS mcp_server_mappings (
-  id TEXT PRIMARY KEY,
-  interface_type TEXT NOT NULL CHECK(interface_type IN ('github', 'jira', 'linear', 'asana', 'trello', 'custom')),
-  mcp_server_name TEXT NOT NULL,
-  description TEXT,
-  is_default BOOLEAN DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);-- Workspaces table - tracks project workspaces
+-- Workspaces table - tracks project workspaces
 CREATE TABLE IF NOT EXISTS workspaces (
   id TEXT PRIMARY KEY,
   path TEXT UNIQUE NOT NULL,
@@ -126,6 +101,17 @@ CREATE TABLE IF NOT EXISTS remote_interfaces (
   sync_direction TEXT CHECK(sync_direction IN ('bidirectional', 'import_only', 'export_only')) DEFAULT 'bidirectional',
   field_mappings TEXT DEFAULT '[]', -- JSON array of field mappings
   last_sync DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- MCP server mappings table - predefined mappings of interface types to MCP server names
+CREATE TABLE IF NOT EXISTS mcp_server_mappings (
+  id TEXT PRIMARY KEY,
+  interface_type TEXT NOT NULL CHECK(interface_type IN ('github', 'jira', 'linear', 'asana', 'trello', 'custom')),
+  mcp_server_name TEXT NOT NULL,
+  description TEXT,
+  is_default BOOLEAN DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );

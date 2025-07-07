@@ -6,7 +6,7 @@
         {
           "step_order": 1,
           "system_tool_fn": "taskpilot_start",
-          "feedback_step": null,
+          "feedback_step": "workspace_context",
           "next_tool": "end"
         }
       ]
@@ -17,7 +17,7 @@
         {
           "step_order": 1,
           "system_tool_fn": "taskpilot_init",
-          "feedback_step": null,
+          "feedback_step": "workspace_context",
           "next_tool": "end"
         }
       ]
