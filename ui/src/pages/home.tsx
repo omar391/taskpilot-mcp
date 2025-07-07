@@ -56,45 +56,47 @@ export function HomePage() {
       {activeWorkspaces.length > 0 && (
         <div className={`${tailwindClasses.card.base} ${tailwindClasses.card.hover}`}>
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div 
-                  className="h-14 w-14 rounded-2xl flex items-center justify-center shadow-lg"
+                  className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl flex items-center justify-center shadow-lg shrink-0"
                   style={{ 
                     background: `linear-gradient(135deg, ${designSystem.colors.accent.green}, ${designSystem.colors.accent.green}dd)` 
                   }}
                 >
-                  <span className="text-2xl">⚡</span>
+                  <span className="text-xl sm:text-2xl">⚡</span>
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <h2 
-                    className={tailwindClasses.typography.title}
+                    className={`${tailwindClasses.typography.title} text-xl sm:text-2xl`}
                     style={{ 
                       background: `linear-gradient(to right, ${designSystem.colors.accent.green}, ${designSystem.colors.accent.green}dd)`,
                       WebkitBackgroundClip: 'text',
                       WebkitTextFillColor: 'transparent',
-                      fontSize: '1.5rem',
                       fontWeight: '700'
                     }}
                   >
                     Active Workspaces
                   </h2>
-                  <p className={tailwindClasses.typography.subtitle}>
+                  <p className={`${tailwindClasses.typography.subtitle} text-sm sm:text-base`}>
                     {activeWorkspaces.length} workspace{activeWorkspaces.length !== 1 ? 's' : ''} connected
                   </p>
                 </div>
               </div>
               
-              {/* Status Overview */}
-              <div className="text-right">
-                <div 
-                  className="text-3xl font-bold"
-                  style={{ color: designSystem.colors.accent.green }}
-                >
-                  {totalTasks}
-                </div>
-                <div className={`${tailwindClasses.typography.caption} uppercase tracking-wide`}>
-                  Total Tasks
+              {/* Status Overview - responsive */}
+              <div className="flex items-center justify-between sm:justify-end gap-4">
+                <span className="text-sm text-gray-500 sm:hidden">Total Tasks:</span>
+                <div className="text-right shrink-0">
+                  <div 
+                    className="text-2xl sm:text-3xl font-bold"
+                    style={{ color: designSystem.colors.accent.green }}
+                  >
+                    {totalTasks}
+                  </div>
+                  <div className={`${tailwindClasses.typography.caption} uppercase tracking-wide hidden sm:block`}>
+                    Total Tasks
+                  </div>
                 </div>
               </div>
             </div>
@@ -104,81 +106,93 @@ export function HomePage() {
               {activeWorkspaces.map((workspace) => (
                 <div key={workspace.id} className={`${tailwindClasses.listItem.base} ${tailwindClasses.listItem.hover}`}>
                   <div 
-                    className="w-1 h-full rounded-sm mr-4"
+                    className="w-1 h-full rounded-sm mr-3 md:mr-4"
                     style={{ backgroundColor: designSystem.colors.accent.green }}
                   />
-                  <div className="flex items-center justify-between flex-1">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div 
-                        className="h-10 w-10 rounded-lg flex items-center justify-center"
-                        style={{ backgroundColor: `${designSystem.colors.accent.green}20` }}
-                      >
-                        <Folder size={18} style={{ color: designSystem.colors.accent.green }} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 
-                          className={tailwindClasses.typography.title}
-                          style={{ color: designSystem.colors.neutral[900] }}
+                  
+                  {/* Responsive layout container */}
+                  <div className="flex-1 space-y-3">
+                    {/* Header row - responsive */}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div 
+                          className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: `${designSystem.colors.accent.green}20` }}
                         >
-                          {workspace.name}
-                        </h3>
-                        <p 
-                          className={`${tailwindClasses.typography.caption} font-mono`}
-                          style={{ color: designSystem.colors.neutral[600] }}
-                        >
-                          {workspace.path}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      {workspace.taskCount && (
-                        <div className="text-right">
-                          <div 
-                            className="text-lg font-bold"
-                            style={{ color: designSystem.colors.accent.green }}
+                          <Folder size={18} style={{ color: designSystem.colors.accent.green }} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 
+                            className={`${tailwindClasses.typography.title} truncate`}
+                            style={{ color: designSystem.colors.neutral[900] }}
                           >
-                            {workspace.taskCount}
+                            {workspace.name}
+                          </h3>
+                          {/* Path - responsive with better breaking */}
+                          <div className="flex items-center gap-2 mt-1">
+                            <p 
+                              className={`${tailwindClasses.typography.caption} font-mono break-all sm:break-normal sm:truncate`}
+                              style={{ color: designSystem.colors.neutral[600] }}
+                              title={workspace.path}
+                            >
+                              {workspace.path}
+                            </p>
                           </div>
-                          <div 
-                            className={tailwindClasses.typography.caption}
-                            style={{ color: designSystem.colors.accent.green }}
-                          >
-                            tasks
+                        </div>
+                      </div>
+                      
+                      {/* Task count - responsive positioning */}
+                      {workspace.taskCount && (
+                        <div className="flex items-center justify-between sm:justify-end gap-2">
+                          <span className="text-sm text-gray-500 sm:hidden">Tasks:</span>
+                          <div className="text-right shrink-0">
+                            <div 
+                              className="text-lg font-bold"
+                              style={{ color: designSystem.colors.accent.green }}
+                            >
+                              {workspace.taskCount}
+                            </div>
+                            <div 
+                              className={`${tailwindClasses.typography.caption} hidden sm:block`}
+                              style={{ color: designSystem.colors.accent.green }}
+                            >
+                              tasks
+                            </div>
                           </div>
                         </div>
                       )}
                     </div>
-                  </div>
-                  
-                  {workspace.activeTask && (
-                    <div 
-                      className="mt-3 p-3 rounded-lg border"
-                      style={{ 
-                        backgroundColor: designSystem.colors.neutral[50],
-                        borderColor: `${designSystem.colors.accent.green}30`
-                      }}
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <div 
-                          className="h-1.5 w-1.5 rounded-full animate-pulse"
-                          style={{ backgroundColor: designSystem.colors.accent.green }}
-                        />
-                        <span 
-                          className={`${tailwindClasses.typography.caption} font-medium uppercase tracking-wide`}
-                          style={{ color: designSystem.colors.accent.green }}
-                        >
-                          ACTIVE TASK
-                        </span>
-                      </div>
-                      <p 
-                        className={`${tailwindClasses.typography.subtitle} font-medium`}
-                        style={{ color: designSystem.colors.neutral[900] }}
+                    
+                    {/* Active task block - always full width */}
+                    {workspace.activeTask && (
+                      <div 
+                        className="p-3 rounded-lg border"
+                        style={{ 
+                          backgroundColor: designSystem.colors.neutral[50],
+                          borderColor: `${designSystem.colors.accent.green}30`
+                        }}
                       >
-                        {workspace.activeTask}
-                      </p>
-                    </div>
-                  )}
+                        <div className="flex items-center gap-2 mb-2">
+                          <div 
+                            className="h-1.5 w-1.5 rounded-full animate-pulse shrink-0"
+                            style={{ backgroundColor: designSystem.colors.accent.green }}
+                          />
+                          <span 
+                            className={`${tailwindClasses.typography.caption} font-medium uppercase tracking-wide`}
+                            style={{ color: designSystem.colors.accent.green }}
+                          >
+                            ACTIVE TASK
+                          </span>
+                        </div>
+                        <p 
+                          className={`${tailwindClasses.typography.subtitle} font-medium break-words`}
+                          style={{ color: designSystem.colors.neutral[900] }}
+                        >
+                          {workspace.activeTask}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -191,27 +205,26 @@ export function HomePage() {
         <div className="space-y-6">
           <div className="flex items-center gap-4">
             <div 
-              className="h-14 w-14 rounded-2xl flex items-center justify-center shadow-lg"
+              className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl flex items-center justify-center shadow-lg shrink-0"
               style={{ 
                 background: `linear-gradient(135deg, ${designSystem.colors.neutral[500]}, ${designSystem.colors.neutral[600]})` 
               }}
             >
-              <span className="text-2xl">💤</span>
+              <span className="text-xl sm:text-2xl">💤</span>
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <h2 
-                className={tailwindClasses.typography.title}
+                className={`${tailwindClasses.typography.title} text-xl sm:text-2xl`}
                 style={{ 
                   background: `linear-gradient(to right, ${designSystem.colors.neutral[500]}, ${designSystem.colors.neutral[600]})`,
                   WebkitBackgroundClip: 'text',
                   WebkitTextFillColor: 'transparent',
-                  fontSize: '1.5rem',
                   fontWeight: '700'
                 }}
               >
                 Available Workspaces
               </h2>
-              <p className={tailwindClasses.typography.subtitle}>
+              <p className={`${tailwindClasses.typography.subtitle} text-sm sm:text-base`}>
                 {inactiveWorkspaces.length > 0 
                   ? `${inactiveWorkspaces.length} workspace${inactiveWorkspaces.length !== 1 ? 's' : ''} ready to connect`
                   : 'No workspaces detected'
@@ -273,67 +286,74 @@ export function HomePage() {
               {inactiveWorkspaces.map((workspace) => (
                 <div key={workspace.id} className={`${tailwindClasses.listItem.base} ${tailwindClasses.listItem.hover}`}>
                   <div 
-                    className="w-1 h-full rounded-sm mr-4"
+                    className="w-1 h-full rounded-sm mr-3 md:mr-4"
                     style={{ backgroundColor: designSystem.colors.neutral[300] }}
                   />
-                  <div className="flex items-center justify-between flex-1">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div 
-                        className="h-10 w-10 rounded-lg flex items-center justify-center"
-                        style={{ backgroundColor: designSystem.colors.neutral[100] }}
-                      >
-                        <Folder size={18} style={{ color: designSystem.colors.neutral[600] }} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 
-                          className={tailwindClasses.typography.title}
-                          style={{ color: designSystem.colors.neutral[900] }}
+                  
+                  {/* Responsive layout for inactive workspaces */}
+                  <div className="flex-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div 
+                          className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: designSystem.colors.neutral[100] }}
                         >
-                          {workspace.name}
-                        </h3>
-                        <p 
-                          className={`${tailwindClasses.typography.caption} font-mono`}
-                          style={{ color: designSystem.colors.neutral[600] }}
-                        >
-                          {workspace.path}
-                        </p>
-                        {workspace.lastActivity && (
-                          <p 
-                            className={tailwindClasses.typography.caption}
-                            style={{ color: designSystem.colors.neutral[500], marginTop: '0.25rem' }}
+                          <Folder size={18} style={{ color: designSystem.colors.neutral[600] }} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 
+                            className={`${tailwindClasses.typography.title} truncate`}
+                            style={{ color: designSystem.colors.neutral[900] }}
                           >
-                            Last active: {formatLastActivity(workspace.lastActivity)}
+                            {workspace.name}
+                          </h3>
+                          <p 
+                            className={`${tailwindClasses.typography.caption} font-mono break-all sm:break-normal sm:truncate`}
+                            style={{ color: designSystem.colors.neutral[600] }}
+                            title={workspace.path}
+                          >
+                            {workspace.path}
                           </p>
+                          {workspace.lastActivity && (
+                            <p 
+                              className={`${tailwindClasses.typography.caption} mt-1`}
+                              style={{ color: designSystem.colors.neutral[500] }}
+                            >
+                              Last active: {formatLastActivity(workspace.lastActivity)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Status and task info - responsive */}
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                        {workspace.status === 'error' && (
+                          <div className="flex items-center gap-1">
+                            <span 
+                              className="h-2 w-2 rounded-full"
+                              style={{ backgroundColor: designSystem.colors.accent.orange }}
+                            />
+                            <span 
+                              className={tailwindClasses.typography.caption}
+                              style={{ color: designSystem.colors.accent.orange }}
+                            >
+                              Error
+                            </span>
+                          </div>
+                        )}
+                        
+                        {workspace.taskCount && (
+                          <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:gap-0">
+                            <span className="text-sm text-gray-500 sm:hidden">Tasks:</span>
+                            <div 
+                              className={`${tailwindClasses.typography.subtitle} font-medium`}
+                              style={{ color: designSystem.colors.neutral[600] }}
+                            >
+                              {workspace.taskCount} tasks
+                            </div>
+                          </div>
                         )}
                       </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      {workspace.status === 'error' && (
-                        <div className="flex items-center gap-1">
-                          <span 
-                            className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: designSystem.colors.accent.orange }}
-                          />
-                          <span 
-                            className={tailwindClasses.typography.caption}
-                            style={{ color: designSystem.colors.accent.orange }}
-                          >
-                            Error
-                          </span>
-                        </div>
-                      )}
-                      
-                      {workspace.taskCount && (
-                        <div className="text-right">
-                          <div 
-                            className={`${tailwindClasses.typography.subtitle} font-medium`}
-                            style={{ color: designSystem.colors.neutral[600] }}
-                          >
-                            {workspace.taskCount} tasks
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>

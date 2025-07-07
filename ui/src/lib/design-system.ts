@@ -174,26 +174,26 @@ export const createButtonStyle = (variant: 'primary' | 'secondary' = 'primary') 
 // CSS class name generators for Tailwind
 export const tailwindClasses = {
     card: {
-        base: 'bg-white rounded-xl p-6 shadow-md border border-gray-200',
+        base: 'bg-white rounded-xl p-4 sm:p-6 shadow-md border border-gray-200',
         hover: 'hover:-translate-y-0.5 hover:shadow-lg transition-all duration-200 ease-in-out'
     },
     listItem: {
-        base: 'bg-white rounded-lg p-4 border border-gray-200 mb-2 flex items-center justify-between',
+        base: 'bg-white rounded-lg p-3 sm:p-4 border border-gray-200 mb-2 flex items-start sm:items-center',
         hover: 'hover:bg-gray-50 transition-colors duration-150'
     },
     typography: {
-        title: 'text-lg font-semibold leading-6',
+        title: 'text-base sm:text-lg font-semibold leading-6',
         subtitle: 'text-sm text-gray-500 leading-tight',
         caption: 'text-xs text-gray-400 leading-tight'
     },
     spacing: {
         xs: 'space-x-1',
         sm: 'space-x-2',
-        md: 'space-x-4',
-        lg: 'space-x-6',
-        xl: 'space-x-8',
-        '2xl': 'space-x-12',
-        '3xl': 'space-x-16'
+        md: 'space-x-3 sm:space-x-4',
+        lg: 'space-x-4 sm:space-x-6',
+        xl: 'space-x-6 sm:space-x-8',
+        '2xl': 'space-x-8 sm:space-x-12',
+        '3xl': 'space-x-12 sm:space-x-16'
     }
 }
 
