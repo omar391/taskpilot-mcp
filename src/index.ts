@@ -3,7 +3,9 @@
 /**
  * TaskPilot MCP Server
  * 
- * A Model Context Protocol server that implements a prompt orchestration system
+ * A Model Context Pro// HTTP mode globals for SSE transport
+let activeServers: Server[] = [];
+let sseEventManager: SSEEventManager;col server that implements a prompt orchestration system
  * based on SWE-agent capabilities. Returns structured prompt instructions to LLMs
  * rather than executing business logic directly, enabling dynamic workflow
  * configuration through tool flows and feedback steps.
@@ -24,6 +26,7 @@ import { initializeGlobalDatabase, getGlobalDatabase, initializeWorkspaceDatabas
 import { DatabaseService } from './services/database-service.js';
 import { SeedManager } from './services/seed-manager.js';
 import { PromptOrchestrator } from './services/prompt-orchestrator.js';
+import { createApiRouter, SSEEventManager } from './api/router.js';
 
 // Tools
 import { StartTool, startToolSchema } from './tools/start.js';
@@ -74,6 +77,7 @@ let remoteInterfaceTool: RemoteInterfaceTool;
 
 // HTTP mode globals for SSE transport
 let activeServers: Server[] = [];
+let sseEventManager: SSEEventManager;
 
 /**
  * Initialize server components
@@ -88,6 +92,9 @@ async function initializeServer() {
     // Initialize services with database service
     seedManager = new SeedManager(globalDb); // SeedManager only needs global DB
     orchestrator = new PromptOrchestrator(globalDb); // PromptOrchestrator only needs global DB
+    
+    // Initialize SSE event manager
+    sseEventManager = new SSEEventManager();
     
     // Initialize global seed data
     await seedManager.initializeGlobalData();
@@ -406,11 +413,11 @@ async function startSSEMode(port: number = 3001) {
     const app = express();
     app.use(express.json());
 
-    // CORS headers for browser access
+    // CORS headers for browser access (updated for REST API)
     app.use((req, res, next) => {
       res.header('Access-Control-Allow-Origin', '*');
-      res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type');
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       if (req.method === 'OPTIONS') {
         res.sendStatus(200);
         return;
@@ -418,12 +425,24 @@ async function startSSEMode(port: number = 3001) {
       next();
     });
 
+    // REST API Routes
+    const apiRouter = createApiRouter(databaseService);
+    app.use('/api', apiRouter);
+
+    // SSE Events endpoint for UI real-time updates
+    app.get('/api/events', (req, res) => {
+      const clientId = req.query.clientId as string || `client_${Date.now()}`;
+      console.log(`New SSE client connected: ${clientId}`);
+      sseEventManager.addClient(clientId, req, res);
+    });
+
     // Health check endpoint
     app.get('/health', (req, res) => {
       res.json({ 
         status: 'healthy', 
         version: '0.1.0',
-        activeConnections: activeServers.length,
+        activeMCPConnections: activeServers.length,
+        activeSSEClients: sseEventManager.getClientCount(),
         timestamp: new Date().toISOString()
       });
     });
@@ -471,7 +490,9 @@ async function startSSEMode(port: number = 3001) {
     // Start HTTP server
     app.listen(port, () => {
       console.error(`TaskPilot MCP server running in SSE mode on http://localhost:${port}`);
-      console.error(`SSE endpoint: http://localhost:${port}/sse`);
+      console.error(`MCP SSE endpoint: http://localhost:${port}/sse`);
+      console.error(`REST API base: http://localhost:${port}/api`);
+      console.error(`UI Events (SSE): http://localhost:${port}/api/events`);
       console.error(`Health check: http://localhost:${port}/health`);
     });
   } catch (error) {

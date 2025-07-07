@@ -93,10 +93,18 @@
   - Implement workspace lifecycle: Active (recent interaction) → Idle (5min) → Inactive (5min more)
 - **Priority**: High
 - **Dependencies**: TP-025, TP-028
-- **Status**: Backlog
-- **Progress**: 0%
-- **Notes**: Confirmed SSE+REST hybrid pattern with refined workspace lifecycle timing
-- **Connected File List**: src/index.ts, src/api/*.ts, src/http-server.ts
+- **Status**: Done
+- **Progress**: 100%
+- **Notes**: ✅ COMPLETED - HTTP server with REST + SSE successfully implemented:
+  - 6 REST API endpoints: GET /api/workspaces, GET /workspaces/{id}/tasks, GET /workspaces/{id}/tool-flows, GET /workspaces/{id}/feedback-steps, POST /workspaces/{id}/tasks, PUT /workspaces/{id}/tasks/{taskId}
+  - SSE event system: /api/events endpoint for real-time UI updates
+  - Complete middleware stack: CORS, rate limiting, error handling, request validation
+  - Dual server architecture: MCP server (SSE transport) + REST API server operating independently
+  - Enhanced health check with both MCP and SSE client counts
+  - Database schema updated with workspace status column
+  - All endpoints tested and working correctly
+  - Error handling for missing workspace tables (graceful degradation)
+- **Connected File List**: src/index.ts, src/api/router.ts, src/api/types.ts, src/api/middleware.ts, src/api/workspaces.ts, src/api/tasks.ts, src/api/tool-flows.ts, src/api/feedback-steps.ts, src/database/schema.sql
 
 ## Task TP-030: Fix Start/Init Tool Flow Context
 - **Title**: Update start/init tools to return workspace rules as feedback step
