@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useParams } from '@tanstack/react-router'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FeedbackEditor } from '@/components/feedback-editor'
 import { WorkspaceRulesDisplay } from '@/components/workspace-rules-display'
@@ -32,11 +33,14 @@ interface Workspace {
 }
 
 export function FeedbackStepsPage() {
+  const params = useParams({ from: '/workspace/$workspaceId/feedback-steps' })
+  const workspaceId = params.workspaceId
+  
   const [globalSteps, setGlobalSteps] = useState<FeedbackStep[]>([])
   const [workspaceSteps, setWorkspaceSteps] = useState<FeedbackStep[]>([])
   const [workspaceRules, setWorkspaceRules] = useState<WorkspaceRule[]>([])
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
-  const [selectedWorkspace, setSelectedWorkspace] = useState<string>('')
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string>(workspaceId)
   const [showCloneDialog, setShowCloneDialog] = useState(false)
   const [stepToClone, setStepToClone] = useState<FeedbackStep | null>(null)
   const [rulesExpanded, setRulesExpanded] = useState(false)

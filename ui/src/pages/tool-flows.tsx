@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useParams } from '@tanstack/react-router'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToolFlowCard } from '@/components/tool-flow-card'
 import { CloneToWorkspace } from '@/components/clone-to-workspace'
@@ -28,11 +29,14 @@ interface Workspace {
 }
 
 export function ToolFlowsPage() {
+  const params = useParams({ from: '/workspace/$workspaceId/tool-flows' })
+  const workspaceId = params.workspaceId
+  
   const [globalFlows, setGlobalFlows] = useState<ToolFlow[]>([])
   const [workspaceFlows, setWorkspaceFlows] = useState<ToolFlow[]>([])
   const [feedbackSteps, setFeedbackSteps] = useState<FeedbackStep[]>([])
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
-  const [selectedWorkspace, setSelectedWorkspace] = useState<string>('')
+  const [selectedWorkspace, setSelectedWorkspace] = useState<string>(workspaceId)
   const [showCloneDialog, setShowCloneDialog] = useState(false)
   const [flowToClone, setFlowToClone] = useState<ToolFlow | null>(null)
 

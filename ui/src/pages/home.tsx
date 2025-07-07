@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { Link } from '@tanstack/react-router'
 import { Folder } from 'lucide-react'
 import { tailwindClasses, designSystem } from '@/lib/design-system'
 
@@ -104,7 +105,12 @@ export function HomePage() {
             {/* Active Workspace List */}
             <div className="space-y-4">
               {activeWorkspaces.map((workspace) => (
-                <div key={workspace.id} className={`${tailwindClasses.listItem.base} ${tailwindClasses.listItem.hover}`}>
+                <Link
+                  key={workspace.id}
+                  to="/workspace/$workspaceId/tool-flows"
+                  params={{ workspaceId: workspace.id }}
+                  className={`${tailwindClasses.listItem.base} ${tailwindClasses.listItem.hover} block cursor-pointer`}
+                >
                   <div 
                     className="w-1 h-full rounded-sm mr-3 md:mr-4"
                     style={{ backgroundColor: designSystem.colors.accent.green }}
@@ -193,7 +199,7 @@ export function HomePage() {
                       </div>
                     )}
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>
@@ -284,7 +290,12 @@ export function HomePage() {
           ) : (
             <div className="space-y-4">
               {inactiveWorkspaces.map((workspace) => (
-                <div key={workspace.id} className={`${tailwindClasses.listItem.base} ${tailwindClasses.listItem.hover}`}>
+                <Link
+                  key={workspace.id}
+                  to="/workspace/$workspaceId/tool-flows"
+                  params={{ workspaceId: workspace.id }}
+                  className={`${tailwindClasses.listItem.base} ${tailwindClasses.listItem.hover} block cursor-pointer`}
+                >
                   <div 
                     className="w-1 h-full rounded-sm mr-3 md:mr-4"
                     style={{ backgroundColor: designSystem.colors.neutral[300] }}
@@ -356,7 +367,7 @@ export function HomePage() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}

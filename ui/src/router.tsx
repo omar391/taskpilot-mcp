@@ -16,6 +16,18 @@ function RootComponent() {
   )
 }
 
+// Workspace layout component
+function WorkspaceLayout() {
+  return (
+    <div className="mobile-app">
+      <main className="main-content">
+        <Outlet />
+      </main>
+      <FloatingNav />
+    </div>
+  )
+}
+
 // Create root route
 const rootRoute = createRootRoute({
   component: RootComponent,
@@ -28,16 +40,23 @@ const homeRoute = createRoute({
   component: HomePage,
 })
 
-// Create tool flows route
-const toolFlowsRoute = createRoute({
+// Create workspace parent route
+const workspaceRoute = createRoute({
   getParentRoute: () => rootRoute,
+  path: '/workspace/$workspaceId',
+  component: WorkspaceLayout,
+})
+
+// Create tool flows route (now workspace-scoped)
+const toolFlowsRoute = createRoute({
+  getParentRoute: () => workspaceRoute,
   path: '/tool-flows',
   component: ToolFlowsPage,
 })
 
-// Create feedback steps route
+// Create feedback steps route (now workspace-scoped)
 const feedbackStepsRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => workspaceRoute,
   path: '/feedback-steps',
   component: FeedbackStepsPage,
 })
@@ -45,8 +64,10 @@ const feedbackStepsRoute = createRoute({
 // Create route tree
 const routeTree = rootRoute.addChildren([
   homeRoute,
-  toolFlowsRoute,
-  feedbackStepsRoute,
+  workspaceRoute.addChildren([
+    toolFlowsRoute,
+    feedbackStepsRoute,
+  ]),
 ])
 
 // Create router
