@@ -25,7 +25,6 @@ export function FeedbackStepsPage() {
   const [workspaceSteps, setWorkspaceSteps] = useState<FeedbackStep[]>([])
   const [workspaceRules, setWorkspaceRules] = useState<WorkspaceRule[]>([])
   const [workspaces, setWorkspaces] = useState<WorkspaceMetadata[]>([])
-  const [selectedWorkspace, setSelectedWorkspace] = useState<string>(workspaceId)
   const [showCloneDialog, setShowCloneDialog] = useState(false)
   const [stepToClone, setStepToClone] = useState<FeedbackStep | null>(null)
   const [rulesExpanded, setRulesExpanded] = useState(false)
@@ -47,7 +46,7 @@ export function FeedbackStepsPage() {
         setWorkspaces(workspacesResponse.data.workspaces)
 
         // Load feedback steps
-        const feedbackStepsResponse = await apiClient.getFeedbackSteps()
+        const feedbackStepsResponse = await apiClient.getFeedbackSteps(workspaceId)
         if (feedbackStepsResponse.error) {
           throw new Error(feedbackStepsResponse.error)
         }
