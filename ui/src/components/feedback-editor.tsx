@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Edit, Save, X, Copy } from 'lucide-react'
+import { Edit, Save, X, Copy, ChevronRight, Eye, EyeOff } from 'lucide-react'
 
 interface FeedbackStep {
   id: string
@@ -36,6 +36,7 @@ export function FeedbackEditor({
   showVariableHelper = true
 }: FeedbackEditorProps) {
   const [isEditing, setIsEditing] = useState(false)
+  const [isTemplateExpanded, setIsTemplateExpanded] = useState(false)
   const [editedTemplate, setEditedTemplate] = useState(feedbackStep.template)
   const [editedDescription, setEditedDescription] = useState(feedbackStep.description)
 
@@ -113,7 +114,7 @@ export function FeedbackEditor({
             <Badge variant={feedbackStep.is_global ? "secondary" : "default"}>
               {feedbackStep.is_global ? "Global" : "Workspace"}
             </Badge>
-            {!isEditable && !feedbackStep.is_global && onClone && (
+            {!isEditable && onClone && (
               <Button
                 variant="outline"
                 size="sm"
@@ -157,7 +158,29 @@ export function FeedbackEditor({
 
         {/* Template */}
         <div>
-          <label className="text-sm font-medium mb-2 block">Template</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium">Template</label>
+            {!isEditing && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsTemplateExpanded(!isTemplateExpanded)}
+                className="h-6 px-2 text-xs"
+              >
+                {isTemplateExpanded ? (
+                  <>
+                    <EyeOff size={12} className="mr-1" />
+                    Hide
+                  </>
+                ) : (
+                  <>
+                    <Eye size={12} className="mr-1" />
+                    Show
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
           {isEditing ? (
             <Textarea
               id={`template-${feedbackStep.id}`}
@@ -167,16 +190,37 @@ export function FeedbackEditor({
               className="min-h-[120px] font-mono text-sm"
             />
           ) : (
-            <div className="p-3 bg-muted rounded-lg">
-              <pre className="text-sm whitespace-pre-wrap font-mono">
-                {feedbackStep.template}
-              </pre>
-            </div>
+            <>
+              {isTemplateExpanded ? (
+                <div className="p-3 bg-muted rounded-lg">
+                  <pre className="text-sm whitespace-pre-wrap font-mono">
+                    {feedbackStep.template}
+                  </pre>
+                </div>
+              ) : (
+                <div className="p-3 bg-muted/50 rounded-lg border border-dashed border-muted-foreground/30">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Template content ({feedbackStep.template.split('\n').length} lines)
+                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsTemplateExpanded(true)}
+                      className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronRight size={12} className="mr-1" />
+                      Expand
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        {/* Variables Helper */}
-        {showVariableHelper && variables.length > 0 && (
+        {/* Variables Helper - Only show when template is expanded or editing */}
+        {showVariableHelper && variables.length > 0 && (isTemplateExpanded || isEditing) && (
           <div>
             <label className="text-sm font-medium mb-2 block">Template Variables</label>
             <div className="flex flex-wrap gap-2">

@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Copy, Edit, Settings, ArrowRight, Play } from 'lucide-react'
+import { Copy, Edit, Settings } from 'lucide-react'
 
 interface ToolFlow {
   id: string
@@ -56,24 +56,32 @@ export function ToolFlowCard({
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Settings size={20} />
-            {flow.tool_name}
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            <Badge variant={flow.is_global ? "secondary" : "default"}>
-              {flow.is_global ? "Global" : "Workspace"}
-            </Badge>
+    <Card className="w-full hover:shadow-md transition-shadow duration-200">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <Settings size={16} className="text-primary flex-shrink-0" />
+              <CardTitle className="text-base font-semibold truncate">
+                {flow.tool_name}
+              </CardTitle>
+              <Badge variant={flow.is_global ? "secondary" : "default"} className="text-xs">
+                {flow.is_global ? "Global" : "Workspace"}
+              </Badge>
+            </div>
+            {flow.description && (
+              <p className="text-sm text-muted-foreground line-clamp-2">{flow.description}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
             {!isEditable && onClone && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => onClone(flow)}
+                className="h-8 px-3"
               >
-                <Copy size={16} className="mr-1" />
+                <Copy size={14} className="mr-1" />
                 Clone
               </Button>
             )}
@@ -82,52 +90,46 @@ export function ToolFlowCard({
                 variant="outline"
                 size="sm"
                 onClick={() => onEdit(flow)}
+                className="h-8 px-3"
               >
-                <Edit size={16} className="mr-1" />
+                <Edit size={14} className="mr-1" />
                 Edit
               </Button>
             )}
           </div>
         </div>
-        {flow.description && (
-          <p className="text-sm text-muted-foreground">{flow.description}</p>
-        )}
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {/* Three-part workflow visualization */}
-        <div className="grid grid-cols-1 gap-3">
-          {/* Part 1: System Tool Function */}
-          <div className="flex items-center gap-3 p-3 border rounded-lg">
-            <div className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
-              1
+      <CardContent className="space-y-3">
+        {/* Horizontal 3-column workflow */}
+        <div className="grid grid-cols-3 gap-3">
+          {/* Column 1: Tool Function */}
+          <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border-t-2 border-blue-500">
+            <div className="text-center">
+              <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mx-auto mb-2">
+                1
+              </div>
+              <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">Tool</p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 font-mono truncate" title={flow.tool_name}>
+                {flow.tool_name}
+              </p>
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium">System Tool Function</p>
-              <p className="text-xs text-muted-foreground font-mono">{flow.tool_name}</p>
-            </div>
-            <Play size={16} className="text-blue-600" />
           </div>
 
-          {/* Arrow */}
-          <div className="flex justify-center">
-            <ArrowRight size={16} className="text-muted-foreground" />
-          </div>
-
-          {/* Part 2: Feedback Step */}
-          <div className="flex items-center gap-3 p-3 border rounded-lg">
-            <div className="flex items-center justify-center w-8 h-8 bg-green-100 text-green-700 rounded-full text-sm font-semibold">
-              2
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium">Feedback Step</p>
+          {/* Column 2: Feedback Step */}
+          <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border-t-2 border-green-500">
+            <div className="text-center">
+              <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-bold mx-auto mb-2">
+                2
+              </div>
+              <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">Feedback</p>
               {isEditable ? (
                 <Select value={flow.feedback_step_id || 'none'} onValueChange={handleFeedbackStepChange}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Select feedback step..." />
+                  <SelectTrigger className="h-6 text-xs bg-background">
+                    <SelectValue placeholder="Select..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No feedback step</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {feedbackSteps.map((step) => (
                       <SelectItem key={step.id} value={step.id}>
                         {step.name}
@@ -136,29 +138,24 @@ export function ToolFlowCard({
                   </SelectContent>
                 </Select>
               ) : (
-                <p className="text-xs text-muted-foreground">
-                  {selectedFeedbackStep?.name || 'No feedback step'}
+                <p className="text-xs text-green-600 dark:text-green-400 truncate" title={selectedFeedbackStep?.name || 'None'}>
+                  {selectedFeedbackStep?.name || 'None'}
                 </p>
               )}
             </div>
           </div>
 
-          {/* Arrow */}
-          <div className="flex justify-center">
-            <ArrowRight size={16} className="text-muted-foreground" />
-          </div>
-
-          {/* Part 3: Next Tool or End */}
-          <div className="flex items-center gap-3 p-3 border rounded-lg">
-            <div className="flex items-center justify-center w-8 h-8 bg-orange-100 text-orange-700 rounded-full text-sm font-semibold">
-              3
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-medium">Next Action</p>
+          {/* Column 3: Next Action */}
+          <div className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg border-t-2 border-orange-500">
+            <div className="text-center">
+              <div className="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-bold mx-auto mb-2">
+                3
+              </div>
+              <p className="text-xs font-medium text-orange-700 dark:text-orange-300 mb-1">Next</p>
               {isEditable ? (
                 <Select value={flow.next_tool || 'end'} onValueChange={handleNextToolChange}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue placeholder="Select next tool..." />
+                  <SelectTrigger className="h-6 text-xs bg-background">
+                    <SelectValue placeholder="Select..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="end">End workflow</SelectItem>
@@ -170,22 +167,22 @@ export function ToolFlowCard({
                   </SelectContent>
                 </Select>
               ) : (
-                <p className="text-xs text-muted-foreground font-mono">
-                  {flow.next_tool || 'End workflow'}
+                <p className="text-xs text-orange-600 dark:text-orange-400 truncate" title={flow.next_tool || 'End'}>
+                  {flow.next_tool || 'End'}
                 </p>
               )}
             </div>
           </div>
         </div>
 
-        {/* Actions for editable flows */}
+        {/* Delete action for editable flows */}
         {isEditable && onDelete && (
-          <div className="pt-2 border-t">
+          <div className="pt-3 border-t">
             <Button
               variant="destructive"
               size="sm"
               onClick={() => onDelete(flow.id)}
-              className="w-full"
+              className="w-full h-8 text-xs"
             >
               Delete Flow
             </Button>

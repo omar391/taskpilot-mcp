@@ -112,31 +112,8 @@ Ready to implement. Proceed with systematic approach.`,
     ]
 
     const mockWorkspaceSteps: FeedbackStep[] = [
-      {
-        id: 'workspace_rules',
-        name: 'Workspace Rules',
-        description: 'Dynamic workspace-specific rules and guidelines automatically updated from user interactions',
-        template: `# Workspace Rules for {{context.workspace_name}}
-
-## Coding Standards
-- Always use const or let instead of var for variable declarations
-- Prefer interfaces over types for object shapes
-- Use async/await over Promise chains
-
-## Testing Requirements  
-- Remember to run unit tests after each task completion
-- Don't commit code without proper test coverage
-
-## File Management
-- Never create files exceeding 300 lines without splitting
-- Always update connected_files list when modifying tasks
-
-**Last Updated**: {{context.analysis_time}}
-**Active Rules**: {{context.rule_count}}`,
-        is_global: false,
-        workspace_id: 'ws_001',
-        variables: ['workspace_name', 'analysis_time', 'rule_count']
-      }
+      // Remove the "Workspace Rules" feedback step since workspace rules
+      // should be a separate auto-evolving system, not feedback steps
     ]
 
     const mockWorkspaceRules: WorkspaceRule[] = [
@@ -197,8 +174,14 @@ Ready to implement. Proceed with systematic approach.`,
   }, [])
 
   const handleCloneStep = (step: FeedbackStep) => {
-    setStepToClone(step)
-    setShowCloneDialog(true)
+    // Clone directly to current workspace instead of showing dialog
+    if (selectedWorkspace) {
+      handleCloneToWorkspace(step.id, selectedWorkspace)
+    } else {
+      // Fallback to dialog if no workspace selected
+      setStepToClone(step)
+      setShowCloneDialog(true)
+    }
   }
 
   const handleCloneToWorkspace = async (stepId: string, workspaceId: string) => {
@@ -227,7 +210,6 @@ Ready to implement. Proceed with systematic approach.`,
   )
 
   const currentWorkspace = workspaces.find(w => w.id === selectedWorkspace)
-  const workspaceRulesStep = currentWorkspaceSteps.find(step => step.name === 'Workspace Rules')
 
   return (
     <div className="space-y-8">
@@ -338,16 +320,14 @@ Ready to implement. Proceed with systematic approach.`,
 
         {/* Workspace Tab */}
         <TabsContent value="workspace" className="space-y-4 mt-6">
-          {/* Workspace Rules Display */}
-          {workspaceRulesStep && (
-            <WorkspaceRulesDisplay
-              rules={workspaceRules}
-              workspaceName={currentWorkspace?.name || 'Unknown Workspace'}
-              lastUpdated={new Date().toISOString()}
-              isExpanded={rulesExpanded}
-              onToggleExpanded={() => setRulesExpanded(!rulesExpanded)}
-            />
-          )}
+          {/* Workspace Rules Display - Always show for workspace context */}
+          <WorkspaceRulesDisplay
+            rules={workspaceRules}
+            workspaceName={currentWorkspace?.name || 'Unknown Workspace'}
+            lastUpdated={new Date().toISOString()}
+            isExpanded={rulesExpanded}
+            onToggleExpanded={() => setRulesExpanded(!rulesExpanded)}
+          />
 
           {/* Workspace Feedback Steps */}
           <div className="modern-card">
