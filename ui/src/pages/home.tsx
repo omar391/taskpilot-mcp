@@ -3,57 +3,112 @@ import { Button } from '@/components/ui/button'
 import { Link } from '@tanstack/react-router'
 import { Folder } from 'lucide-react'
 import { tailwindClasses, designSystem } from '@/lib/design-system'
-
-interface Workspace {
-  id: string
-  name: string
-  path: string
-  status: 'connected' | 'disconnected' | 'error'
-  lastActivity?: string
-  taskCount?: number
-  activeTask?: string
-}
+import { apiClient, type WorkspaceMetadata } from '@/lib/api-client'
 
 export function HomePage() {
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [workspaces, setWorkspaces] = useState<WorkspaceMetadata[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Mock data for development - will be replaced with real API calls
+  // Load workspaces from API
   useEffect(() => {
-    // Simulate initial data load
-    const mockWorkspaces: Workspace[] = [
-      {
-        id: '1',
-        name: 'TaskPilot MCP',
-        path: '/Volumes/Projects/business/AstronLab/omar391/taskpilot-mcp',
-        status: 'connected',
-        lastActivity: new Date(Date.now() - 300000).toISOString(), // 5 mins ago
-        taskCount: 12,
-        activeTask: 'TP-011: Implement Home Screen'
-      },
-      {
-        id: '2', 
-        name: 'Demo Project',
-        path: '/Users/demo/projects/demo-app',
-        status: 'disconnected',
-        lastActivity: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-        taskCount: 5
+    const loadWorkspaces = async () => {
+      setLoading(true)
+      setError(null)
+      
+      try {
+        const response = await apiClient.getWorkspaces()
+        
+        if (response.error) {
+          setError(response.error)
+        } else {
+          setWorkspaces(response.data.workspaces)
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load workspaces')
+      } finally {
+        setLoading(false)
       }
-    ]
-    
-    setWorkspaces(mockWorkspaces)
+    }
+
+    loadWorkspaces()
+
+    // Set up real-time updates via SSE
+    const unsubscribeWorkspaceUpdates = apiClient.onSSEEvent('workspace.status_changed', (event) => {
+      setWorkspaces(prev => {
+        const workspaceId = event.data.workspaceId
+        return prev.map(ws => 
+          ws.id === workspaceId 
+            ? { ...ws, ...event.data.changes }
+            : ws
+        )
+      })
+    })
+
+    return () => {
+      unsubscribeWorkspaceUpdates()
+    }
   }, [])
 
 
 
   
-  const totalTasks = workspaces.reduce((sum, ws) => sum + (ws.taskCount || 0), 0)
+  const totalTasks = workspaces.reduce((sum, ws) => sum + (ws.task_count || 0), 0)
   
-  const activeWorkspaces = workspaces.filter(ws => ws.status === 'connected')
-  const inactiveWorkspaces = workspaces.filter(ws => ws.status !== 'connected')
+  const activeWorkspaces = workspaces.filter(ws => ws.status === 'active')
+  const inactiveWorkspaces = workspaces.filter(ws => ws.status !== 'active')
 
   return (
     <div className="space-y-8">
-      {/* Show Active Workspaces first if any exist */}
+      {/* Loading State */}
+      {loading && (
+        <div className={`${tailwindClasses.card.base} ${tailwindClasses.card.hover}`}>
+          <div className="text-center py-12">
+            <div 
+              className="h-12 w-12 mx-auto rounded-full border-4 border-gray-200 border-t-blue-500 animate-spin mb-4"
+            />
+            <p className={tailwindClasses.typography.subtitle}>Loading workspaces...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className={`${tailwindClasses.card.base}`} style={{ borderColor: designSystem.colors.accent.orange }}>
+          <div className="text-center py-12">
+            <div 
+              className="h-12 w-12 mx-auto rounded-full flex items-center justify-center mb-4"
+              style={{ backgroundColor: `${designSystem.colors.accent.orange}20` }}
+            >
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <h3 
+              className={`${tailwindClasses.typography.title} mb-3`}
+              style={{ color: designSystem.colors.accent.orange }}
+            >
+              Failed to Load Workspaces
+            </h3>
+            <p className={`${tailwindClasses.typography.subtitle} mb-4`}>
+              {error}
+            </p>
+            <Button 
+              onClick={() => window.location.reload()}
+              className="rounded-xl"
+              style={{
+                backgroundColor: designSystem.colors.accent.orange,
+                color: 'white'
+              }}
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Content - only show when not loading and no error */}
+      {!loading && !error && (
+        <>
+          {/* Show Active Workspaces first if any exist */}
       {activeWorkspaces.length > 0 && (
         <div className={`${tailwindClasses.card.base} ${tailwindClasses.card.hover}`}>
           <div className="space-y-6">
@@ -148,7 +203,7 @@ export function HomePage() {
                       </div>
                       
                       {/* Task count - responsive positioning */}
-                      {workspace.taskCount && (
+                      {workspace.task_count && (
                         <div className="flex items-center justify-between sm:justify-end gap-2">
                           <span className="text-sm text-gray-500 sm:hidden">Tasks:</span>
                           <div className="text-right shrink-0">
@@ -156,7 +211,7 @@ export function HomePage() {
                               className="text-lg font-bold"
                               style={{ color: designSystem.colors.accent.green }}
                             >
-                              {workspace.taskCount}
+                              {workspace.task_count}
                             </div>
                             <div 
                               className={`${tailwindClasses.typography.caption} hidden sm:block`}
@@ -170,7 +225,7 @@ export function HomePage() {
                     </div>
                     
                     {/* Active task block - always full width */}
-                    {workspace.activeTask && (
+                    {workspace.active_task && (
                       <div 
                         className="p-3 rounded-lg border"
                         style={{ 
@@ -194,7 +249,7 @@ export function HomePage() {
                           className={`${tailwindClasses.typography.subtitle} font-medium break-words`}
                           style={{ color: designSystem.colors.neutral[900] }}
                         >
-                          {workspace.activeTask}
+                          {workspace.active_task}
                         </p>
                       </div>
                     )}
@@ -325,12 +380,12 @@ export function HomePage() {
                           >
                             {workspace.path}
                           </p>
-                          {workspace.lastActivity && (
+                          {workspace.last_activity && (
                             <p 
                               className={`${tailwindClasses.typography.caption} mt-1`}
                               style={{ color: designSystem.colors.neutral[500] }}
                             >
-                              Last active: {formatLastActivity(workspace.lastActivity)}
+                              Last active: {formatLastActivity(workspace.last_activity)}
                             </p>
                           )}
                         </div>
@@ -353,14 +408,14 @@ export function HomePage() {
                           </div>
                         )}
                         
-                        {workspace.taskCount && (
+                        {workspace.task_count && (
                           <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:gap-0">
                             <span className="text-sm text-gray-500 sm:hidden">Tasks:</span>
                             <div 
                               className={`${tailwindClasses.typography.subtitle} font-medium`}
                               style={{ color: designSystem.colors.neutral[600] }}
                             >
-                              {workspace.taskCount} tasks
+                              {workspace.task_count} tasks
                             </div>
                           </div>
                         )}
@@ -373,6 +428,8 @@ export function HomePage() {
           )}
         </div>
       </div>
+        </>
+      )}
     </div>
   )
 

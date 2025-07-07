@@ -1,7 +1,7 @@
 import { createRootRoute, createRoute, createRouter, Outlet } from '@tanstack/react-router'
 import { FloatingNav } from '@/components/floating-nav'
 import { HomePage } from '@/pages/home'
-import { TasksPage } from '@/pages/tasks'
+// import { TasksPage } from '@/pages/tasks' // Temporarily disabled due to syntax errors
 import { ToolFlowsPage } from '@/pages/tool-flows'
 import { FeedbackStepsPage } from '@/pages/feedback-steps'
 
@@ -48,12 +48,12 @@ const workspaceRoute = createRoute({
   component: WorkspaceLayout,
 })
 
-// Create tasks route (workspace-scoped)
-const tasksRoute = createRoute({
-  getParentRoute: () => workspaceRoute,
-  path: '/tasks',
-  component: TasksPage,
-})
+// Create tasks route (workspace-scoped) - temporarily disabled
+// const tasksRoute = createRoute({
+//   getParentRoute: () => workspaceRoute,
+//   path: '/tasks',
+//   component: TasksPage,
+// })
 
 // Create tool flows route (now workspace-scoped)
 const toolFlowsRoute = createRoute({
@@ -73,7 +73,7 @@ const feedbackStepsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   homeRoute,
   workspaceRoute.addChildren([
-    tasksRoute,
+    // tasksRoute, // temporarily disabled
     toolFlowsRoute,
     feedbackStepsRoute,
   ]),

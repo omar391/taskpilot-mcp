@@ -3,28 +3,7 @@ import { useParams } from '@tanstack/react-router'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Plus, CheckCircle, Clock, AlertCircle, Calendar } from 'lucide-react'
-
-interface Task {
-  id: string
-  title: string
-  description: string
-  priority: 'High' | 'Medium' | 'Low'
-  status: 'Backlog' | 'In-Progress' | 'Blocked' | 'Review' | 'Done' | 'Dropped'
-  progress: number
-  dependencies?: string[]
-  connectedFiles?: string[]
-  notes?: string
-  createdAt: string
-  updatedAt: string
-  completedAt?: string
-  workspaceId: string
-}
-
-interface Workspace {
-  id: string
-  name: string
-  path: string
-}
+import { apiClient, type Task, type WorkspaceMetadata } from '@/lib/api-client'
 
 export function TasksPage() {
   const params = useParams({ from: '/workspace/$workspaceId/tasks' })
@@ -32,11 +11,68 @@ export function TasksPage() {
   
   const [currentTasks, setCurrentTasks] = useState<Task[]>([])
   const [historyTasks, setHistoryTasks] = useState<Task[]>([])
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [workspaces, setWorkspaces] = useState<WorkspaceMetadata[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Mock data for development - will be replaced with real API calls
+  // Load tasks from API
   useEffect(() => {
-    const mockCurrentTasks: Task[] = [
+    const loadTasks = async () => {
+      setLoading(true)
+      setError(null)
+      
+      try {
+        // Load workspaces first
+        const workspacesResponse = await apiClient.getWorkspaces()
+        if (workspacesResponse.error) {
+          throw new Error(workspacesResponse.error)
+        }
+        setWorkspaces(workspacesResponse.data.workspaces)
+
+        // Load tasks for current workspace
+        const tasksResponse = await apiClient.getTasks(workspaceId)
+        if (tasksResponse.error) {
+          throw new Error(tasksResponse.error)
+        }
+        
+        const allTasks = tasksResponse.data.tasks
+        setCurrentTasks(allTasks.filter(task => task.status !== 'done' && task.status !== 'dropped'))
+        setHistoryTasks(allTasks.filter(task => task.status === 'done' || task.status === 'dropped'))
+
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load tasks')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadTasks()
+
+    // Set up real-time updates via SSE
+    const unsubscribeTaskUpdates = apiClient.onSSEEvent('task.updated', (event) => {
+      const updatedTask = event.data.task
+      setCurrentTasks(prev => prev.map(task => 
+        task.id === updatedTask.id ? updatedTask : task
+      ))
+      setHistoryTasks(prev => prev.map(task => 
+        task.id === updatedTask.id ? updatedTask : task
+      ))
+    })
+
+    const unsubscribeTaskCreated = apiClient.onSSEEvent('task.created', (event) => {
+      const newTask = event.data.task
+      if (newTask.status !== 'done' && newTask.status !== 'dropped') {
+        setCurrentTasks(prev => [...prev, newTask])
+      } else {
+        setHistoryTasks(prev => [...prev, newTask])
+      }
+    })
+
+    return () => {
+      unsubscribeTaskUpdates()
+      unsubscribeTaskCreated()
+    }
+  }, [workspaceId])
       {
         id: 'TP-017',
         title: 'Add Tasks menu with Current and History tabs',

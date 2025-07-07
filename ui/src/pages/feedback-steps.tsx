@@ -6,16 +6,7 @@ import { WorkspaceRulesDisplay } from '@/components/workspace-rules-display'
 import { CloneToWorkspace } from '@/components/clone-to-workspace'
 import { Button } from '@/components/ui/button'
 import { Plus, Globe, Building, MessageSquare } from 'lucide-react'
-
-interface FeedbackStep {
-  id: string
-  name: string
-  description: string
-  template: string
-  is_global: boolean
-  workspace_id?: string
-  variables?: string[]
-}
+import { apiClient, type FeedbackStep, type WorkspaceMetadata } from '@/lib/api-client'
 
 interface WorkspaceRule {
   id: string
@@ -24,12 +15,6 @@ interface WorkspaceRule {
   content: string
   confidence: number
   created_at: string
-}
-
-interface Workspace {
-  id: string
-  name: string
-  path: string
 }
 
 export function FeedbackStepsPage() {

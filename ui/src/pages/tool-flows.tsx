@@ -4,28 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToolFlowCard } from '@/components/tool-flow-card'
 import { Button } from '@/components/ui/button'
 import { Plus, Globe, Building, Settings } from 'lucide-react'
-
-interface ToolFlow {
-  id: string
-  tool_name: string
-  description: string
-  feedback_step_id: string | null
-  next_tool: string | null
-  is_global: boolean
-  workspace_id?: string
-}
-
-interface FeedbackStep {
-  id: string
-  name: string
-  description: string
-}
-
-interface Workspace {
-  id: string
-  name: string
-  path: string
-}
+import { apiClient, type ToolFlow, type FeedbackStep, type WorkspaceMetadata } from '@/lib/api-client'
 
 export function ToolFlowsPage() {
   const params = useParams({ from: '/workspace/$workspaceId/tool-flows' })
@@ -34,8 +13,10 @@ export function ToolFlowsPage() {
   const [globalFlows, setGlobalFlows] = useState<ToolFlow[]>([])
   const [workspaceFlows, setWorkspaceFlows] = useState<ToolFlow[]>([])
   const [feedbackSteps, setFeedbackSteps] = useState<FeedbackStep[]>([])
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [workspaces, setWorkspaces] = useState<WorkspaceMetadata[]>([])
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>(workspaceId)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Available MCP tools
   const availableTools = [
@@ -52,91 +33,47 @@ export function ToolFlowsPage() {
     'taskpilot_remote_interface'
   ]
 
-  // Mock data for development - will be replaced with real API calls
+  // Load data from API
   useEffect(() => {
-    const mockGlobalFlows: ToolFlow[] = [
-      {
-        id: 'gf_001',
-        tool_name: 'taskpilot_add',
-        description: 'Analytical validation workflow for new task creation',
-        feedback_step_id: 'analytical_validation',
-        next_tool: 'taskpilot_create_task',
-        is_global: true
-      },
-      {
-        id: 'gf_002',
-        tool_name: 'taskpilot_focus',
-        description: 'Task focusing with implementation guidance',
-        feedback_step_id: 'task_focus_context',
-        next_tool: null,
-        is_global: true
-      },
-      {
-        id: 'gf_003',
-        tool_name: 'taskpilot_audit',
-        description: 'Project health checking and cleanup recommendations',
-        feedback_step_id: 'audit_analysis',
-        next_tool: null,
-        is_global: true
-      }
-    ]
+    const loadData = async () => {
+      setLoading(true)
+      setError(null)
+      
+      try {
+        // Load workspaces first
+        const workspacesResponse = await apiClient.getWorkspaces()
+        if (workspacesResponse.error) {
+          throw new Error(workspacesResponse.error)
+        }
+        setWorkspaces(workspacesResponse.data.workspaces)
 
-    const mockWorkspaceFlows: ToolFlow[] = [
-      {
-        id: 'wf_001',
-        tool_name: 'taskpilot_add',
-        description: 'Custom team review workflow for task creation',
-        feedback_step_id: 'team_review',
-        next_tool: 'taskpilot_create_task',
-        is_global: false,
-        workspace_id: 'ws_001'
-      }
-    ]
+        // Load tool flows for current workspace
+        const toolFlowsResponse = await apiClient.getToolFlows(workspaceId)
+        if (toolFlowsResponse.error) {
+          throw new Error(toolFlowsResponse.error)
+        }
+        
+        // Separate global and workspace-specific flows
+        const allFlows = toolFlowsResponse.data.toolFlows
+        setGlobalFlows(allFlows.filter(flow => flow.is_global))
+        setWorkspaceFlows(allFlows.filter(flow => !flow.is_global))
 
-    const mockFeedbackSteps: FeedbackStep[] = [
-      {
-        id: 'analytical_validation',
-        name: 'Analytical Validation',
-        description: 'Apply 6-step analytical thinking framework'
-      },
-      {
-        id: 'task_focus_context',
-        name: 'Task Focus Context',
-        description: 'Provide implementation guidance and context'
-      },
-      {
-        id: 'audit_analysis',
-        name: 'Audit Analysis',
-        description: 'Project health analysis and recommendations'
-      },
-      {
-        id: 'team_review',
-        name: 'Team Review',
-        description: 'Custom team review process'
-      }
-    ]
+        // Load feedback steps for current workspace
+        const feedbackResponse = await apiClient.getFeedbackSteps(workspaceId)
+        if (feedbackResponse.error) {
+          throw new Error(feedbackResponse.error)
+        }
+        setFeedbackSteps(feedbackResponse.data.feedbackSteps)
 
-    const mockWorkspaces: Workspace[] = [
-      {
-        id: 'ws_001',
-        name: 'TaskPilot MCP',
-        path: '/Volumes/Projects/business/AstronLab/omar391/taskpilot-mcp'
-      },
-      {
-        id: 'ws_002',
-        name: 'Demo Project',
-        path: '/Users/demo/projects/demo-app'
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load data')
+      } finally {
+        setLoading(false)
       }
-    ]
-
-    setGlobalFlows(mockGlobalFlows)
-    setWorkspaceFlows(mockWorkspaceFlows)
-    setFeedbackSteps(mockFeedbackSteps)
-    setWorkspaces(mockWorkspaces)
-    if (mockWorkspaces.length > 0) {
-      setSelectedWorkspace(mockWorkspaces[0].id)
     }
-  }, [])
+
+    loadData()
+  }, [workspaceId])
 
   const handleCloneFlow = (flow: ToolFlow) => {
     // Directly clone to current workspace without dialog
@@ -168,7 +105,30 @@ export function ToolFlowsPage() {
 
   return (
     <div className="space-y-8">
-      {/* Modern Header */}
+      {/* Loading State */}
+      {loading && (
+        <div className="text-center py-12">
+          <div className="h-12 w-12 mx-auto rounded-full border-4 border-gray-200 border-t-blue-500 animate-spin mb-4" />
+          <p className="text-gray-600">Loading tool flows...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="text-center py-12">
+          <div className="h-12 w-12 mx-auto rounded-full bg-red-100 flex items-center justify-center mb-4">
+            <span className="text-2xl">⚠️</span>
+          </div>
+          <h3 className="text-lg font-semibold text-red-600 mb-3">Failed to Load Tool Flows</h3>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      )}
+
+      {/* Content - only show when not loading and no error */}
+      {!loading && !error && (
+        <>
+          {/* Modern Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="h-16 w-16 rounded-3xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-xl">
@@ -334,6 +294,8 @@ export function ToolFlowsPage() {
           </div>
         </TabsContent>
       </Tabs>
+        </>
+      )}
     </div>
   )
 }
