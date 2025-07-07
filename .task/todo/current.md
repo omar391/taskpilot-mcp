@@ -2,21 +2,13 @@
 
 # Current Tasks
 
-## Task ID: TP-019
-- **Title**: Remove clone popup from Tools Flow (workspace context assumed)
-- **Description**: Remove clone-to-workspace dialog from Tools Flow page since users have already entered a workspace context. Simplify the interface by removing redundant workspace selection.
-- **Priority**: Medium
-- **Dependencies**: TP-018 ✅
-- **Status**: Backlog
-- **Progress**: 0%
-- **Notes**: Update Tools Flow page to assume current workspace context, remove CloneToWorkspace dialog component usage, streamline user flow.
-- **Connected File List**: ui/src/pages/tool-flows.tsx, ui/src/components/clone-to-workspace.tsx
+# Current Tasks
 
 ## Task ID: TP-020
 - **Title**: Add workspace name header to task-related pages
 - **Description**: Display current workspace name in headers of Tasks, Tool Flows, and Feedback Steps pages. This provides clear context about which workspace the user is working in.
 - **Priority**: Medium
-- **Dependencies**: TP-019
+- **Dependencies**: TP-019 ✅
 - **Status**: Backlog
 - **Progress**: 0%
 - **Notes**: Add workspace context to page headers, ensure consistent workspace name display across all workspace-scoped pages.

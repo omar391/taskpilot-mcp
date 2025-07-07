@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToolFlowCard } from '@/components/tool-flow-card'
-import { CloneToWorkspace } from '@/components/clone-to-workspace'
 import { Button } from '@/components/ui/button'
 import { Plus, Globe, Building } from 'lucide-react'
 
@@ -37,8 +36,6 @@ export function ToolFlowsPage() {
   const [feedbackSteps, setFeedbackSteps] = useState<FeedbackStep[]>([])
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>(workspaceId)
-  const [showCloneDialog, setShowCloneDialog] = useState(false)
-  const [flowToClone, setFlowToClone] = useState<ToolFlow | null>(null)
 
   // Available MCP tools
   const availableTools = [
@@ -142,17 +139,9 @@ export function ToolFlowsPage() {
   }, [])
 
   const handleCloneFlow = (flow: ToolFlow) => {
-    setFlowToClone(flow)
-    setShowCloneDialog(true)
-  }
-
-  const handleCloneToWorkspace = async (flowId: string, workspaceId: string) => {
-    const flowToClone = globalFlows.find(f => f.id === flowId)
-    if (!flowToClone) return
-
-    // Create new workspace flow
+    // Directly clone to current workspace without dialog
     const clonedFlow: ToolFlow = {
-      ...flowToClone,
+      ...flow,
       id: `wf_${Date.now()}`,
       is_global: false,
       workspace_id: workspaceId
@@ -196,24 +185,7 @@ export function ToolFlowsPage() {
         </div>
       </div>
 
-      {/* Clone Dialog */}
-      {showCloneDialog && flowToClone && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-md">
-            <CloneToWorkspace
-              flow={flowToClone}
-              workspaces={workspaces}
-              onClone={handleCloneToWorkspace}
-              onClose={() => {
-                setShowCloneDialog(false)
-                setFlowToClone(null)
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Modern Tabs with Enhanced Mobile Support */}
+      {/* Enhanced Tab Design with Improved Mobile Support */}
       <Tabs defaultValue="global" className="w-full">
         <TabsList className="grid w-full grid-cols-2 rounded-2xl p-1 bg-muted/30 h-12">
           <TabsTrigger 
