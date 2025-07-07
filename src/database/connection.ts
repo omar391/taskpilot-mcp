@@ -1,6 +1,6 @@
 import sqlite3 from 'sqlite3';
 import { promisify } from 'util';
-import { readFileSync } from 'fs';
+import { readFileSync, mkdirSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -9,11 +9,22 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // Enable verbose mode for debugging
 sqlite3.verbose();
 
+export enum DatabaseType {
+  GLOBAL = 'global',
+  WORKSPACE = 'workspace'
+}
+
 export class DatabaseManager {
   private db: sqlite3.Database | null = null;
   private isInitialized = false;
+  private readonly dbType: DatabaseType;
 
-  constructor(private dbPath: string = ':memory:') {}
+  constructor(
+    private dbPath: string = ':memory:',
+    dbType: DatabaseType = DatabaseType.WORKSPACE
+  ) {
+    this.dbType = dbType;
+  }
 
   /**
    * Initialize database connection and create schema
@@ -24,6 +35,14 @@ export class DatabaseManager {
     }
 
     try {
+      // Ensure directory exists for file-based databases
+      if (this.dbPath !== ':memory:') {
+        const dbDir = dirname(this.dbPath);
+        if (!existsSync(dbDir)) {
+          mkdirSync(dbDir, { recursive: true });
+        }
+      }
+
       // Create database connection
       this.db = new sqlite3.Database(this.dbPath, (err) => {
         if (err) {
@@ -50,15 +69,54 @@ export class DatabaseManager {
       const schemaPath = join(__dirname, 'schema.sql');
       const schema = readFileSync(schemaPath, 'utf8');
       
+      // Filter schema based on database type
+      const filteredSchema = this.filterSchemaByType(schema);
+      
       // Execute schema using exec which handles multi-statement scripts better
-      await execAsync(schema);
+      await execAsync(filteredSchema);
 
       this.isInitialized = true;
-      console.log('Database initialized successfully');
+      console.log(`${this.dbType} database initialized successfully at ${this.dbPath}`);
     } catch (error) {
       console.error('Error initializing database:', error);
       throw error;
     }
+  }
+
+  /**
+   * Filter schema SQL based on database type
+   */
+  private filterSchemaByType(schema: string): string {
+    const lines = schema.split('\n');
+    const filteredLines: string[] = [];
+    let skipBlock = false;
+    let currentBlock = '';
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      // Check for database type comments
+      if (trimmedLine.startsWith('-- @global-only')) {
+        skipBlock = this.dbType !== DatabaseType.GLOBAL;
+        currentBlock = 'global';
+        continue;
+      } else if (trimmedLine.startsWith('-- @workspace-only')) {
+        skipBlock = this.dbType !== DatabaseType.WORKSPACE;
+        currentBlock = 'workspace';
+        continue;
+      } else if (trimmedLine.startsWith('-- @end')) {
+        skipBlock = false;
+        currentBlock = '';
+        continue;
+      }
+
+      // Include line if not skipping
+      if (!skipBlock) {
+        filteredLines.push(line);
+      }
+    }
+
+    return filteredLines.join('\n');
   }
 
   /**
@@ -134,25 +192,83 @@ export class DatabaseManager {
   }
 }
 
-// Global database instance
-let dbInstance: DatabaseManager | null = null;
+// Database instances
+let globalDbInstance: DatabaseManager | null = null;
+let workspaceDbInstance: DatabaseManager | null = null;
 
 /**
  * Get or create global database instance
  */
-export function getDatabase(dbPath?: string): DatabaseManager {
-  if (!dbInstance) {
-    // Use default database path in user's home directory if not specified
-    const defaultPath = dbPath || join(process.env.HOME || '/tmp', '.taskpilot', 'taskpilot.db');
-    dbInstance = new DatabaseManager(defaultPath);
+export function getGlobalDatabase(): DatabaseManager {
+  if (!globalDbInstance) {
+    const globalPath = join(process.env.HOME || '/tmp', '.taskpilot', 'global.db');
+    globalDbInstance = new DatabaseManager(globalPath, DatabaseType.GLOBAL);
   }
-  return dbInstance;
+  return globalDbInstance;
+}
+
+/**
+ * Get or create workspace database instance
+ */
+export function getWorkspaceDatabase(workspacePath: string): DatabaseManager {
+  if (!workspaceDbInstance) {
+    const workspaceDbPath = join(workspacePath, '.taskpilot', 'task.db');
+    workspaceDbInstance = new DatabaseManager(workspaceDbPath, DatabaseType.WORKSPACE);
+  }
+  return workspaceDbInstance;
 }
 
 /**
  * Initialize global database instance
  */
+export async function initializeGlobalDatabase(): Promise<DatabaseManager> {
+  const db = getGlobalDatabase();
+  await db.initialize();
+  return db;
+}
+
+/**
+ * Initialize workspace database instance
+ */
+export async function initializeWorkspaceDatabase(workspacePath: string): Promise<DatabaseManager> {
+  const db = getWorkspaceDatabase(workspacePath);
+  await db.initialize();
+  return db;
+}
+
+/**
+ * Initialize both databases
+ */
+export async function initializeBothDatabases(workspacePath: string): Promise<{
+  global: DatabaseManager;
+  workspace: DatabaseManager;
+}> {
+  const [global, workspace] = await Promise.all([
+    initializeGlobalDatabase(),
+    initializeWorkspaceDatabase(workspacePath)
+  ]);
+  
+  return { global, workspace };
+}
+
+// Legacy methods for backward compatibility
+/**
+ * @deprecated Use getGlobalDatabase() or getWorkspaceDatabase() instead
+ */
+export function getDatabase(dbPath?: string): DatabaseManager {
+  console.warn('getDatabase() is deprecated. Use getGlobalDatabase() or getWorkspaceDatabase() instead.');
+  if (!globalDbInstance) {
+    const defaultPath = dbPath || join(process.env.HOME || '/tmp', '.taskpilot', 'taskpilot.db');
+    globalDbInstance = new DatabaseManager(defaultPath, DatabaseType.GLOBAL);
+  }
+  return globalDbInstance;
+}
+
+/**
+ * @deprecated Use initializeGlobalDatabase() or initializeWorkspaceDatabase() instead
+ */
 export async function initializeDatabase(dbPath?: string): Promise<DatabaseManager> {
+  console.warn('initializeDatabase() is deprecated. Use initializeGlobalDatabase() or initializeWorkspaceDatabase() instead.');
   const db = getDatabase(dbPath);
   await db.initialize();
   return db;

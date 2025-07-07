@@ -18,7 +18,8 @@ import {
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { initializeDatabase, getDatabase } from './database/connection.js';
+import { initializeGlobalDatabase, getGlobalDatabase, initializeWorkspaceDatabase, getWorkspaceDatabase } from './database/connection.js';
+import { DatabaseService } from './services/database-service.js';
 import { SeedManager } from './services/seed-manager.js';
 import { PromptOrchestrator } from './services/prompt-orchestrator.js';
 
@@ -52,7 +53,7 @@ const server = new Server(
 );
 
 // Global instances
-let db: any;
+let databaseService: DatabaseService;
 let seedManager: SeedManager;
 let orchestrator: PromptOrchestrator;
 let startTool: StartTool;
@@ -72,30 +73,32 @@ let remoteInterfaceTool: RemoteInterfaceTool;
  */
 async function initializeServer() {
   try {
-    // Initialize database
-    db = await initializeDatabase();
-    console.log('Database initialized successfully');
+    // Initialize global database and create database service
+    const globalDb = await initializeGlobalDatabase();
+    databaseService = new DatabaseService(globalDb);
+    console.log('Global database initialized successfully');
 
-    // Initialize services
-    seedManager = new SeedManager(db);
-    orchestrator = new PromptOrchestrator(db);
+    // Initialize services with database service
+    seedManager = new SeedManager(globalDb); // SeedManager only needs global DB
+    orchestrator = new PromptOrchestrator(globalDb); // PromptOrchestrator only needs global DB
     
     // Initialize global seed data
     await seedManager.initializeGlobalData();
     console.log('Global seed data loaded successfully');
 
-    // Initialize tools
-    startTool = new StartTool(db);
-    initTool = new InitTool(db);
-    addTool = new AddTool(db);
-    createTaskTool = new CreateTaskTool(db);
-    statusTool = new StatusTool(db);
-    updateTool = new UpdateTool(db);
-    focusTool = new FocusTool(db);
-    auditTool = new AuditTool(db);
-    githubTool = new GitHubTool(db);
-    ruleUpdateTool = new RuleUpdateTool(db);
-    remoteInterfaceTool = new RemoteInterfaceTool(db);
+    // Initialize tools with database service (they'll need to be updated to use it)
+    // For now, pass globalDb to maintain compatibility
+    startTool = new StartTool(globalDb);
+    initTool = new InitTool(globalDb);
+    addTool = new AddTool(globalDb);
+    createTaskTool = new CreateTaskTool(globalDb);
+    statusTool = new StatusTool(globalDb);
+    updateTool = new UpdateTool(globalDb);
+    focusTool = new FocusTool(globalDb);
+    auditTool = new AuditTool(globalDb);
+    githubTool = new GitHubTool(globalDb);
+    ruleUpdateTool = new RuleUpdateTool(globalDb);
+    remoteInterfaceTool = new RemoteInterfaceTool(globalDb);
     
     console.log('TaskPilot MCP server initialized successfully');
   } catch (error) {
@@ -280,13 +283,21 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
  * Handler for reading resource contents
  */
 server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-  const url = new URL(request.params.uri);
-  const path = url.pathname;
+  const uri = request.params.uri;
+  
+  // Parse taskpilot:// URIs manually since URL constructor doesn't handle custom schemes well
+  let path: string;
+  if (uri.startsWith('taskpilot://')) {
+    path = '/' + uri.substring(12); // Remove 'taskpilot://' prefix
+  } else {
+    const url = new URL(uri);
+    path = url.pathname;
+  }
 
   try {
     switch (path) {
       case '/workspaces': {
-        const workspaces = await db.all(
+        const workspaces = await databaseService.globalAll(
           'SELECT * FROM workspaces ORDER BY last_activity DESC'
         );
         return {
@@ -299,7 +310,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       }
 
       case '/global-flows': {
-        const flows = await db.all(`
+        const flows = await databaseService.globalAll(`
           SELECT tf.*, 
                  json_group_array(
                    json_object(
@@ -327,7 +338,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       }
 
       case '/global-feedback': {
-        const feedbackSteps = await db.all(
+        const feedbackSteps = await databaseService.globalAll(
           'SELECT * FROM feedback_steps WHERE workspace_id IS NULL ORDER BY name'
         );
         return {
@@ -370,16 +381,16 @@ async function main() {
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
   console.error('Shutting down TaskPilot MCP server...');
-  if (db) {
-    await db.close();
+  if (databaseService) {
+    await databaseService.close();
   }
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   console.error('Shutting down TaskPilot MCP server...');
-  if (db) {
-    await db.close();
+  if (databaseService) {
+    await databaseService.close();
   }
   process.exit(0);
 });

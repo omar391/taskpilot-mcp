@@ -25,10 +25,16 @@
   - Update all services to query appropriate database based on data scope
 - **Priority**: High  
 - **Dependencies**: None
-- **Status**: Backlog
-- **Progress**: 0%
-- **Notes**: Global DB location confirmed: ~/.taskpilot/global.db, Workspace DB: {workspace}/.taskpilot/task.db
-- **Connected File List**: src/database/connection.ts, src/database/schema.sql, src/services/*.ts
+- **Status**: Done
+- **Progress**: 100%
+- **Notes**: ✅ COMPLETED - Dual database architecture successfully implemented with:
+  - Global DB: ~/.taskpilot/global.db for workspaces, sessions, global tool flows, feedback steps, MCP mappings
+  - Workspace DB: {workspace}/.taskpilot/task.db for tasks, GitHub configs, remote interfaces (on-demand initialization)
+  - Schema filtering system with @global-only/@workspace-only annotations  
+  - DatabaseService providing unified access to both databases
+  - Resource endpoints working correctly for global data queries
+  - Backward compatibility maintained for existing tools
+- **Connected File List**: src/database/connection.ts, src/database/schema.sql, src/services/database-service.ts, src/index.ts
 
 ## Task TP-027: Add Drizzle ORM Integration
 - **Title**: Replace manual SQL with Drizzle ORM for type safety and migrations
