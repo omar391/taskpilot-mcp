@@ -248,6 +248,25 @@ Ready to implement. Proceed with systematic approach.`,
         </div>
       </div>
 
+      {/* Workspace Context */}
+      {currentWorkspace && (
+        <div className="modern-card">
+          <div className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <MessageSquare size={14} className="text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-sm">{currentWorkspace.name}</p>
+                <p className="text-xs text-muted-foreground font-mono truncate">
+                  {currentWorkspace.path}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Clone Dialog */}
       {showCloneDialog && stepToClone && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

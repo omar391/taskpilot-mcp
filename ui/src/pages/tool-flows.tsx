@@ -3,7 +3,7 @@ import { useParams } from '@tanstack/react-router'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToolFlowCard } from '@/components/tool-flow-card'
 import { Button } from '@/components/ui/button'
-import { Plus, Globe, Building } from 'lucide-react'
+import { Plus, Globe, Building, Settings } from 'lucide-react'
 
 interface ToolFlow {
   id: string
@@ -184,6 +184,25 @@ export function ToolFlowsPage() {
           </div>
         </div>
       </div>
+
+      {/* Workspace Context */}
+      {currentWorkspace && (
+        <div className="modern-card">
+          <div className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Settings size={14} className="text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-sm">{currentWorkspace.name}</p>
+                <p className="text-xs text-muted-foreground font-mono truncate">
+                  {currentWorkspace.path}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Enhanced Tab Design with Improved Mobile Support */}
       <Tabs defaultValue="global" className="w-full">
