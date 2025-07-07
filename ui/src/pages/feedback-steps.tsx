@@ -4,7 +4,6 @@ import { FeedbackEditor } from '@/components/feedback-editor'
 import { WorkspaceRulesDisplay } from '@/components/workspace-rules-display'
 import { CloneToWorkspace } from '@/components/clone-to-workspace'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus, Globe, Building, MessageSquare } from 'lucide-react'
 
 interface FeedbackStep {
@@ -227,13 +226,22 @@ Ready to implement. Proceed with systematic approach.`,
   const workspaceRulesStep = currentWorkspaceSteps.find(step => step.name === 'Workspace Rules')
 
   return (
-    <div className="p-4 space-y-6">
-      {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold">Feedback Steps</h1>
-        <p className="text-muted-foreground">
-          Manage instruction templates and dynamic rules
-        </p>
+    <div className="space-y-8">
+      {/* Modern Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="h-16 w-16 rounded-3xl bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center shadow-xl">
+            <span className="text-3xl">💬</span>
+          </div>
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-green-500 to-green-600 bg-clip-text text-transparent">
+              Feedback Steps
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Manage instruction templates and dynamic rules
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Clone Dialog */}
@@ -253,32 +261,41 @@ Ready to implement. Proceed with systematic approach.`,
         </div>
       )}
 
-      {/* Tabs */}
+      {/* Modern Tabs */}
       <Tabs defaultValue="global" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="global" className="flex items-center gap-2">
+        <TabsList className="grid w-full grid-cols-2 rounded-2xl p-1 bg-muted/30">
+          <TabsTrigger 
+            value="global" 
+            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
             <Globe size={16} />
             Global
           </TabsTrigger>
-          <TabsTrigger value="workspace" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="workspace" 
+            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
             <Building size={16} />
             Workspace
           </TabsTrigger>
         </TabsList>
 
         {/* Global Tab */}
-        <TabsContent value="global" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe size={20} />
-                Global Feedback Steps
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                These are read-only global instruction templates. Click "Clone" to customize them for your workspace.
-              </p>
+        <TabsContent value="global" className="space-y-4 mt-6">
+          <div className="modern-card">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                  <Globe size={20} className="text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">Global Feedback Steps</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Read-only instruction templates. Clone to customize for your workspace.
+                  </p>
+                </div>
+              </div>
+              
               <div className="space-y-4">
                 {globalSteps.map((step) => (
                   <FeedbackEditor
@@ -290,12 +307,12 @@ Ready to implement. Proceed with systematic approach.`,
                   />
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
 
         {/* Workspace Tab */}
-        <TabsContent value="workspace" className="space-y-4">
+        <TabsContent value="workspace" className="space-y-4 mt-6">
           {/* Workspace Rules Display */}
           {workspaceRulesStep && (
             <WorkspaceRulesDisplay
@@ -308,44 +325,59 @@ Ready to implement. Proceed with systematic approach.`,
           )}
 
           {/* Workspace Feedback Steps */}
-          <Card>
-            <CardHeader>
+          <div className="modern-card">
+            <div className="p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Building size={20} />
-                  Workspace Feedback Steps
-                </CardTitle>
-                <Button size="sm" variant="outline">
-                  <Plus size={16} className="mr-1" />
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                    <Building size={20} className="text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Workspace Feedback Steps</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Custom templates for your specific workspace
+                    </p>
+                  </div>
+                </div>
+                <Button size="sm" className="rounded-xl shadow-sm">
+                  <Plus size={16} className="mr-2" />
                   New Step
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent>
+              
               {currentWorkspace && (
-                <div className="mb-4">
-                  <p className="text-sm text-muted-foreground">
-                    <strong>Current Workspace:</strong> {currentWorkspace.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground font-mono">
-                    {currentWorkspace.path}
-                  </p>
+                <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Building size={14} className="text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm">{currentWorkspace.name}</p>
+                      <p className="text-xs text-muted-foreground font-mono truncate">
+                        {currentWorkspace.path}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
 
               {currentWorkspaceSteps.length === 0 ? (
-                <div className="text-center py-8">
-                  <MessageSquare className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground mb-4">
-                    No custom feedback steps for this workspace yet.
-                  </p>
-                  <p className="text-sm text-muted-foreground mb-4">
+                <div className="text-center py-12">
+                  <div className="h-16 w-16 mx-auto rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+                    <MessageSquare size={24} className="text-muted-foreground" />
+                  </div>
+                  <h3 className="font-medium mb-2">No custom feedback steps yet</h3>
+                  <p className="text-muted-foreground text-sm mb-4">
                     Clone global steps to customize instruction templates for your specific needs.
                   </p>
-                  <Button variant="outline" onClick={() => {
-                    const globalTab = document.querySelector('[value="global"]') as HTMLButtonElement
-                    globalTab?.click()
-                  }}>
+                  <Button 
+                    variant="outline" 
+                    className="rounded-xl"
+                    onClick={() => {
+                      const globalTab = document.querySelector('[value="global"]') as HTMLButtonElement
+                      globalTab?.click()
+                    }}
+                  >
                     Browse Global Steps
                   </Button>
                 </div>
@@ -362,8 +394,8 @@ Ready to implement. Proceed with systematic approach.`,
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

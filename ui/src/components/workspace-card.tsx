@@ -1,7 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Folder, Clock, Activity } from 'lucide-react'
+import { Folder, Clock, Activity, Wifi, WifiOff, AlertTriangle } from 'lucide-react'
 
 interface WorkspaceCardProps {
   workspace: {
@@ -18,16 +16,32 @@ interface WorkspaceCardProps {
 }
 
 export function WorkspaceCard({ workspace, onConnect, onDisconnect }: WorkspaceCardProps) {
-  const getStatusColor = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case 'connected':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+        return {
+          color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+          icon: Wifi,
+          pulse: 'bg-emerald-500'
+        }
       case 'disconnected':
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+        return {
+          color: 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400',
+          icon: WifiOff,
+          pulse: 'bg-gray-400'
+        }
       case 'error':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+        return {
+          color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+          icon: AlertTriangle,
+          pulse: 'bg-red-500'
+        }
       default:
-        return 'bg-gray-100 text-gray-800'
+        return {
+          color: 'bg-gray-100 text-gray-600',
+          icon: WifiOff,
+          pulse: 'bg-gray-400'
+        }
     }
   }
 
@@ -44,50 +58,76 @@ export function WorkspaceCard({ workspace, onConnect, onDisconnect }: WorkspaceC
     return `${Math.floor(diffMins / 1440)}d ago`
   }
 
+  const statusConfig = getStatusConfig(workspace.status)
+  const StatusIcon = statusConfig.icon
+
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Folder size={20} />
-            {workspace.name}
-          </CardTitle>
-          <Badge variant="secondary" className={getStatusColor(workspace.status)}>
+    <div className="modern-card">
+      <div className="p-5 space-y-4">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Folder size={20} className="text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-lg truncate">{workspace.name}</h3>
+              <p className="text-xs text-muted-foreground font-mono truncate">
+                {workspace.path}
+              </p>
+            </div>
+          </div>
+          
+          <div className={`status-indicator ${statusConfig.color}`}>
+            <StatusIcon size={12} />
             {workspace.status}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="text-sm text-muted-foreground">
-          <p className="font-mono text-xs truncate">{workspace.path}</p>
+          </div>
         </div>
         
-        <div className="flex items-center gap-4 text-sm">
-          <div className="flex items-center gap-1">
-            <Clock size={16} />
-            <span>{formatLastActivity(workspace.lastActivity)}</span>
+        {/* Stats */}
+        <div className="flex items-center gap-6 text-sm">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-muted/50 flex items-center justify-center">
+              <Clock size={14} className="text-muted-foreground" />
+            </div>
+            <span className="text-muted-foreground">
+              {formatLastActivity(workspace.lastActivity)}
+            </span>
           </div>
+          
           {workspace.taskCount !== undefined && (
-            <div className="flex items-center gap-1">
-              <Activity size={16} />
-              <span>{workspace.taskCount} tasks</span>
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-muted/50 flex items-center justify-center">
+                <Activity size={14} className="text-muted-foreground" />
+              </div>
+              <span className="text-muted-foreground">
+                {workspace.taskCount} tasks
+              </span>
             </div>
           )}
         </div>
 
+        {/* Active Task */}
         {workspace.activeTask && (
-          <div className="text-xs bg-muted p-2 rounded">
-            <span className="font-medium">Active:</span> {workspace.activeTask}
+          <div className="p-3 rounded-xl bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20">
+            <div className="flex items-center gap-2 text-xs text-primary font-medium mb-1">
+              <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse"></div>
+              ACTIVE TASK
+            </div>
+            <p className="text-sm font-medium text-foreground">
+              {workspace.activeTask}
+            </p>
           </div>
         )}
 
+        {/* Actions */}
         <div className="flex gap-2 pt-2">
           {workspace.status === 'connected' ? (
             <Button
               variant="outline"
               size="sm"
               onClick={() => onDisconnect?.(workspace.id)}
-              className="flex-1"
+              className="flex-1 rounded-xl"
             >
               Disconnect
             </Button>
@@ -95,13 +135,13 @@ export function WorkspaceCard({ workspace, onConnect, onDisconnect }: WorkspaceC
             <Button
               size="sm"
               onClick={() => onConnect?.(workspace.id)}
-              className="flex-1"
+              className="flex-1 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
             >
               Connect
             </Button>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

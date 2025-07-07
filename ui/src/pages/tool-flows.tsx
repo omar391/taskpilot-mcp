@@ -3,7 +3,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToolFlowCard } from '@/components/tool-flow-card'
 import { CloneToWorkspace } from '@/components/clone-to-workspace'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus, Globe, Building } from 'lucide-react'
 
 interface ToolFlow {
@@ -175,13 +174,22 @@ export function ToolFlowsPage() {
   const currentWorkspace = workspaces.find(w => w.id === selectedWorkspace)
 
   return (
-    <div className="p-4 space-y-6">
-      {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold">Tool Flows</h1>
-        <p className="text-muted-foreground">
-          Configure workflow sequences and automation rules
-        </p>
+    <div className="space-y-8">
+      {/* Modern Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="h-16 w-16 rounded-3xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-xl">
+            <span className="text-3xl">⚡</span>
+          </div>
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 bg-clip-text text-transparent">
+              Tool Flows
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Configure workflow sequences and automation rules
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Clone Dialog */}
@@ -201,32 +209,41 @@ export function ToolFlowsPage() {
         </div>
       )}
 
-      {/* Tabs */}
+      {/* Modern Tabs */}
       <Tabs defaultValue="global" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="global" className="flex items-center gap-2">
+        <TabsList className="grid w-full grid-cols-2 rounded-2xl p-1 bg-muted/30">
+          <TabsTrigger 
+            value="global" 
+            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
             <Globe size={16} />
             Global
           </TabsTrigger>
-          <TabsTrigger value="workspace" className="flex items-center gap-2">
+          <TabsTrigger 
+            value="workspace" 
+            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
+          >
             <Building size={16} />
             Workspace
           </TabsTrigger>
         </TabsList>
 
         {/* Global Tab */}
-        <TabsContent value="global" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe size={20} />
-                Global Tool Flows
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                These are read-only global configurations. Click "Clone" to customize them for your workspace.
-              </p>
+        <TabsContent value="global" className="space-y-4 mt-6">
+          <div className="modern-card">
+            <div className="p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <Globe size={20} className="text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">Global Tool Flows</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Read-only configurations. Clone to customize for your workspace.
+                  </p>
+                </div>
+              </div>
+              
               <div className="space-y-3">
                 {globalFlows.map((flow) => (
                   <ToolFlowCard
@@ -239,49 +256,65 @@ export function ToolFlowsPage() {
                   />
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
 
         {/* Workspace Tab */}
-        <TabsContent value="workspace" className="space-y-4">
-          <Card>
-            <CardHeader>
+        <TabsContent value="workspace" className="space-y-4 mt-6">
+          <div className="modern-card">
+            <div className="p-6 space-y-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Building size={20} />
-                  Workspace Tool Flows
-                </CardTitle>
-                <Button size="sm" variant="outline">
-                  <Plus size={16} className="mr-1" />
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                    <Building size={20} className="text-purple-600 dark:text-purple-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Workspace Tool Flows</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Custom configurations for your specific workspace
+                    </p>
+                  </div>
+                </div>
+                <Button size="sm" className="rounded-xl shadow-sm">
+                  <Plus size={16} className="mr-2" />
                   New Flow
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent>
+              
               {currentWorkspace && (
-                <div className="mb-4">
-                  <p className="text-sm text-muted-foreground">
-                    <strong>Current Workspace:</strong> {currentWorkspace.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground font-mono">
-                    {currentWorkspace.path}
-                  </p>
+                <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Building size={14} className="text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm">{currentWorkspace.name}</p>
+                      <p className="text-xs text-muted-foreground font-mono truncate">
+                        {currentWorkspace.path}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
 
               {currentWorkspaceFlows.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground mb-4">
-                    No custom flows for this workspace yet.
-                  </p>
-                  <p className="text-sm text-muted-foreground mb-4">
+                <div className="text-center py-12">
+                  <div className="h-16 w-16 mx-auto rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+                    <Building size={24} className="text-muted-foreground" />
+                  </div>
+                  <h3 className="font-medium mb-2">No custom flows yet</h3>
+                  <p className="text-muted-foreground text-sm mb-4">
                     Clone global flows to customize them for your specific needs.
                   </p>
-                  <Button variant="outline" onClick={() => {
-                    const globalTab = document.querySelector('[value="global"]') as HTMLButtonElement
-                    globalTab?.click()
-                  }}>
+                  <Button 
+                    variant="outline" 
+                    className="rounded-xl"
+                    onClick={() => {
+                      const globalTab = document.querySelector('[value="global"]') as HTMLButtonElement
+                      globalTab?.click()
+                    }}
+                  >
                     Browse Global Flows
                   </Button>
                 </div>
@@ -300,8 +333,8 @@ export function ToolFlowsPage() {
                   ))}
                 </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

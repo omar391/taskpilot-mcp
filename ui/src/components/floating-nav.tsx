@@ -36,7 +36,7 @@ export function FloatingNav() {
             className={cn('nav-item', isActive && 'active')}
           >
             <Icon size={20} />
-            <span className="text-xs mt-1">{item.label}</span>
+            <span className="text-xs mt-1 font-medium">{item.label}</span>
           </Link>
         )
       })}

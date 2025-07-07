@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge'
 import { Wifi, WifiOff, AlertCircle, CheckCircle2 } from 'lucide-react'
 
 interface ConnectionStatusProps {
@@ -20,30 +19,26 @@ export function ConnectionStatus({
         return {
           icon: CheckCircle2,
           label: 'Connected',
-          variant: 'default' as const,
-          className: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-200 dark:border-green-800'
+          className: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800/50'
         }
       case 'connecting':
         return {
           icon: Wifi,
           label: 'Connecting...',
-          variant: 'secondary' as const,
-          className: 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-800'
+          className: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800/50'
         }
       case 'error':
         return {
           icon: AlertCircle,
           label: 'Error',
-          variant: 'destructive' as const,
-          className: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900 dark:text-red-200 dark:border-red-800'
+          className: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800/50'
         }
       case 'disconnected':
       default:
         return {
           icon: WifiOff,
           label: 'Disconnected',
-          variant: 'outline' as const,
-          className: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900 dark:text-gray-200 dark:border-gray-800'
+          className: 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-800/50'
         }
     }
   }
@@ -52,12 +47,9 @@ export function ConnectionStatus({
   const Icon = config.icon
 
   return (
-    <Badge 
-      variant={config.variant}
-      className={`${config.className} ${className || ''}`}
-    >
-      {showIcon && <Icon size={12} className="mr-1" />}
+    <div className={`status-indicator ${config.className} ${className || ''}`}>
+      {showIcon && <Icon size={12} />}
       {message || config.label}
-    </Badge>
+    </div>
   )
 }
