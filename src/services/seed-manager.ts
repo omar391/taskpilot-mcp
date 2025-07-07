@@ -48,52 +48,50 @@ export class SeedManager {
         { sql: 'DELETE FROM feedback_steps WHERE workspace_id IS NULL' },
         { sql: 'DELETE FROM mcp_server_mappings' },
         
-        // Insert global feedback steps
-        ...feedbackStepsData.global_feedback_steps.map((step: any) => ({
+        // Insert global feedback steps (now direct array)
+        ...feedbackStepsData.map((step: any) => ({
           sql: `INSERT INTO feedback_steps (id, name, instructions, workspace_id, metadata, created_at, updated_at)
                 VALUES (?, ?, ?, NULL, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
           params: [
-            uuidv4(),
+            step.id,
             step.name,
-            step.instructions,
-            JSON.stringify(step.metadata || {})
+            step.templateContent,
+            JSON.stringify({})
           ]
         })),
 
-        // Insert global tool flows
-        ...toolFlowsData.global_tool_flows.flatMap((flow: any) => [
-          // Insert tool flow
-          {
-            sql: `INSERT INTO tool_flows (id, tool_name, workspace_id, created_at, updated_at)
-                  VALUES (?, ?, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-            params: [flow.tool_name, flow.tool_name] // Use tool_name as ID for global flows
-          },
-          // Insert flow steps
-          ...flow.flow_steps.map((step: any) => ({
-            sql: `INSERT INTO tool_flow_steps (id, tool_flow_id, step_order, system_tool_fn, feedback_step, next_tool)
-                  VALUES (?, ?, ?, ?, ?, ?)`,
-            params: [
-              uuidv4(),
-              flow.tool_name,
-              step.step_order,
-              step.system_tool_fn,
-              step.feedback_step || null,
-              step.next_tool || null
-            ]
-          }))
-        ]),
+        // Insert global tool flows (now direct array - individual tool flows)
+        ...toolFlowsData.map((flow: any) => ({
+          sql: `INSERT INTO tool_flows (id, tool_name, workspace_id, created_at, updated_at)
+                VALUES (?, ?, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          params: [flow.id, flow.toolName]
+        })),
 
-        // Insert MCP server mappings
+        // Insert tool flow steps (create individual steps for each tool flow)
+        ...toolFlowsData.map((flow: any) => ({
+          sql: `INSERT INTO tool_flow_steps (id, tool_flow_id, step_order, system_tool_fn, feedback_step, next_tool)
+                VALUES (?, ?, ?, ?, ?, ?)`,
+          params: [
+            `${flow.id}_step_1`,
+            flow.id,
+            1,
+            flow.toolName,
+            flow.feedbackStepId || null,
+            flow.nextTool || null
+          ]
+        })),
+
+        // Insert MCP server mappings (now direct array)
         ...mcpMappingsData.map((mapping: any) => ({
           sql: `INSERT INTO mcp_server_mappings 
                 (id, interface_type, mcp_server_name, description, is_default, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
           params: [
             mapping.id,
-            mapping.interface_type,
-            mapping.mcp_server_name,
-            mapping.description,
-            mapping.is_default
+            mapping.interfaceType,
+            mapping.mcpServerName,
+            mapping.description || '',
+            mapping.isDefault
           ]
         }))
       ]);
@@ -197,7 +195,7 @@ export class SeedManager {
       return {
         id: step.id,
         name: step.name,
-        instructions: step.instructions,
+        instructions: step.template_content,
         workspace_id: undefined,
         metadata: JSON.parse(step.metadata || '{}'),
         created_at: step.created_at,
@@ -235,7 +233,7 @@ export class SeedManager {
       return {
         id: step.id,
         name: step.name,
-        instructions: step.instructions,
+        instructions: step.template_content,
         workspace_id: step.workspace_id || undefined,
         metadata: JSON.parse(step.metadata || '{}'),
         created_at: step.created_at,
