@@ -23,6 +23,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { initializeGlobalDatabase, getGlobalDatabase, initializeWorkspaceDatabase, getWorkspaceDatabase } from './database/connection.js';
+import { initializeGlobalDatabaseService } from './database/global-queries.js';
 import { DatabaseService } from './services/database-service.js';
 import { SeedManager } from './services/seed-manager.js';
 import { PromptOrchestrator } from './services/prompt-orchestrator.js';
@@ -100,10 +101,13 @@ async function updateWorkspaceActivity(workspacePath: string): Promise<void> {
 }
 async function initializeServer() {
   try {
-    // Initialize global database and create database service
+    // Initialize global database using new Drizzle system
+    const globalDbService = await initializeGlobalDatabaseService();
+    
+    // For backward compatibility, also initialize the old system
     const globalDb = await initializeGlobalDatabase();
     databaseService = new DatabaseService(globalDb);
-    console.log('Global database initialized successfully');
+    console.log('Database systems initialized successfully');
 
     // Initialize services with database service
     seedManager = new SeedManager(globalDb); // SeedManager only needs global DB
@@ -139,7 +143,7 @@ async function initializeServer() {
     ruleUpdateTool = new RuleUpdateTool(globalDb);
     remoteInterfaceTool = new RemoteInterfaceTool(globalDb);
     
-    console.log('TaskPilot MCP server initialized successfully');
+    console.log('TaskPilot MCP server initialized successfully (Drizzle ORM integration active)');
   } catch (error) {
     console.error('Error initializing server:', error);
     process.exit(1);
