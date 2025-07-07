@@ -70,10 +70,17 @@
   - Include UI audit step to add endpoints on-demand if needed during integration
 - **Priority**: High
 - **Dependencies**: TP-026
-- **Status**: Backlog
-- **Progress**: 0%
-- **Notes**: Start with minimal endpoint set, audit UI during integration to add any missing endpoints on-demand
-- **Connected File List**: ui/src/pages/*.tsx, API documentation
+- **Status**: Done
+- **Progress**: 100%
+- **Notes**: ✅ COMPLETED - Minimal API design successfully created with:
+  - 6 core REST endpoints: GET /workspaces, GET /workspaces/{id}/tasks, GET /workspaces/{id}/tool-flows, GET /workspaces/{id}/feedback-steps, POST /workspaces/{id}/tasks, PUT /workspaces/{id}/tasks/{taskId}
+  - SSE events for real-time updates: workspace.status_changed, task.updated, task.created
+  - Complete API documentation with request/response schemas
+  - Database mapping strategy using dual database architecture
+  - Caching, rate limiting, and error handling specifications
+  - On-demand expansion plan for additional endpoints during integration
+  - OpenAPI specification plan for automatic documentation
+- **Connected File List**: api-design.md, ui/src/pages/*.tsx
 
 ## Task TP-029: Implement HTTP Server with REST + SSE
 - **Title**: Add HTTP server alongside MCP server for UI communication
