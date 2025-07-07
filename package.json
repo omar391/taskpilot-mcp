@@ -16,6 +16,8 @@
     "watch": "tsc --watch",
     "lint": "tsc --noEmit",
     "inspector": "bunx @modelcontextprotocol/inspector build/index.js",
+    "inspector:sse": "bunx @modelcontextprotocol/inspector http://localhost:3001/sse",
+    "start:sse": "bun run build && node build/index.js --sse --port=3001",
     "dev": "bun run watch",
     "start": "bun run build && node build/index.js",
     "ui:dev": "cd ui && bun run dev",
@@ -31,11 +33,13 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "0.6.0",
     "@types/uuid": "^10.0.0",
+    "express": "^5.1.0",
     "sqlite3": "^5.1.7",
     "uuid": "^11.1.0",
     "zod": "^3.25.74"
   },
   "devDependencies": {
+    "@types/express": "^5.0.3",
     "@types/node": "^20.19.4",
     "concurrently": "^9.2.0",
     "typescript": "^5.3.3"
