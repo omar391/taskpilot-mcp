@@ -73,112 +73,83 @@ export function TasksPage() {
       unsubscribeTaskCreated()
     }
   }, [workspaceId])
-      {
-        id: 'TP-017',
-        title: 'Add Tasks menu with Current and History tabs',
-        description: 'Create new Tasks navigation item in floating nav with two tabs for task management functionality within workspace context.',
-        priority: 'High',
-        status: 'In-Progress',
-        progress: 20,
-        dependencies: ['TP-016'],
-        connectedFiles: ['ui/src/pages/tasks.tsx', 'ui/src/components/floating-nav.tsx', 'ui/src/router.tsx'],
-        notes: 'Implementation started - creating Tasks page component with tab navigation',
-        createdAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-        updatedAt: new Date().toISOString(),
-        workspaceId: workspaceId
-      },
-      {
-        id: 'TP-018',
-        title: 'Improve tab design consistency across existing pages',
-        description: 'Enhance visual design of tab components used in Tool Flows and Feedback Steps pages.',
-        priority: 'Medium',
-        status: 'Backlog',
-        progress: 0,
-        dependencies: ['TP-017'],
-        connectedFiles: ['ui/src/pages/tool-flows.tsx', 'ui/src/pages/feedback-steps.tsx'],
-        notes: 'Waiting for TP-017 completion',
-        createdAt: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-        updatedAt: new Date(Date.now() - 1800000).toISOString(), // 30 mins ago
-        workspaceId: workspaceId
-      },
-      {
-        id: 'TP-019',
-        title: 'Remove clone popup from Tools Flow',
-        description: 'Remove clone-to-workspace dialog since users have already entered workspace context.',
-        priority: 'Medium',
-        status: 'Backlog',
-        progress: 0,
-        dependencies: ['TP-016'],
-        connectedFiles: ['ui/src/pages/tool-flows.tsx', 'ui/src/components/clone-to-workspace.tsx'],
-        notes: 'Ready to start - dependency completed',
-        createdAt: new Date(Date.now() - 10800000).toISOString(), // 3 hours ago
-        updatedAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-        workspaceId: workspaceId
-      }
-    ]
-
-    const mockHistoryTasks: Task[] = [
-      {
-        id: 'TP-015',
-        title: 'Make workspace cards clickable for navigation',
-        description: 'Implement clickable workspace cards on the home page that navigate users into workspace-specific pages.',
-        priority: 'High',
-        status: 'Done',
-        progress: 100,
-        dependencies: ['TP-014'],
-        connectedFiles: ['ui/src/pages/home.tsx', 'ui/src/router.tsx', 'ui/src/components/floating-nav.tsx'],
-        notes: 'Successfully implemented workspace-based routing and clickable navigation',
-        createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-        updatedAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-        completedAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-        workspaceId: workspaceId
-      },
-      {
-        id: 'TP-016',
-        title: 'Implement conditional floating navigation',
-        description: 'Modify floating navigation to only appear when users are inside workspace pages.',
-        priority: 'High',
-        status: 'Done',
-        progress: 100,
-        dependencies: ['TP-015'],
-        connectedFiles: ['ui/src/components/floating-nav.tsx'],
-        notes: 'Completed as part of TP-015 implementation',
-        createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-        updatedAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-        completedAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-        workspaceId: workspaceId
-      }
-    ]
-
-    const mockWorkspaces: Workspace[] = [
-      {
-        id: '1',
-        name: 'TaskPilot MCP',
-        path: '/Volumes/Projects/business/AstronLab/omar391/taskpilot-mcp'
-      },
-      {
-        id: '2',
-        name: 'Demo Project',
-        path: '/Users/demo/projects/demo-app'
-      }
-    ]
-
-    setCurrentTasks(mockCurrentTasks)
-    setHistoryTasks(mockHistoryTasks)
-    setWorkspaces(mockWorkspaces)
-  }, [workspaceId])
 
   const currentWorkspace = workspaces.find(w => w.id === workspaceId)
 
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="h-16 w-16 rounded-3xl bg-muted animate-pulse" />
+            <div>
+              <div className="h-10 w-32 bg-muted animate-pulse rounded mb-2" />
+              <div className="h-5 w-48 bg-muted animate-pulse rounded" />
+            </div>
+          </div>
+          <div className="h-9 w-24 bg-muted animate-pulse rounded-xl" />
+        </div>
+        
+        {/* Content Skeleton */}
+        <div className="modern-card">
+          <div className="p-6 space-y-4">
+            <div className="h-6 w-40 bg-muted animate-pulse rounded" />
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-24 bg-muted animate-pulse rounded-lg" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-8">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="h-16 w-16 rounded-3xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-xl">
+              <span className="text-3xl">📋</span>
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-500 to-purple-600 bg-clip-text text-transparent">
+                Tasks
+              </h1>
+              <p className="text-muted-foreground text-lg">
+                Manage your workspace tasks and track progress
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="modern-card">
+          <div className="p-6 text-center">
+            <div className="h-16 w-16 mx-auto rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
+              <AlertCircle size={24} className="text-red-600 dark:text-red-400" />
+            </div>
+            <h3 className="font-medium mb-2">Failed to Load Tasks</h3>
+            <p className="text-muted-foreground text-sm mb-4">{error}</p>
+            <Button onClick={() => window.location.reload()} className="rounded-xl">
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const getStatusIcon = (status: Task['status']) => {
     switch (status) {
-      case 'Done':
+      case 'done':
         return <CheckCircle size={16} className="text-green-600" />
-      case 'In-Progress':
+      case 'in-progress':
         return <Clock size={16} className="text-blue-600" />
-      case 'Blocked':
+      case 'blocked':
         return <AlertCircle size={16} className="text-red-600" />
-      case 'Review':
+      case 'review':
         return <CheckCircle size={16} className="text-yellow-600" />
       default:
         return <Calendar size={16} className="text-gray-600" />
@@ -187,11 +158,11 @@ export function TasksPage() {
 
   const getPriorityColor = (priority: Task['priority']) => {
     switch (priority) {
-      case 'High':
+      case 'high':
         return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-      case 'Medium':
+      case 'medium':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-      case 'Low':
+      case 'low':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
@@ -210,7 +181,7 @@ export function TasksPage() {
     return `${Math.floor(diffMins / 1440)}d ago`
   }
 
-  const TaskCard = ({ task, showCompletedDate = false }: { task: Task; showCompletedDate?: boolean }) => (
+  const TaskCard = ({ task }: { task: Task }) => (
     <div className="modern-card hover:shadow-md transition-shadow duration-200">
       <div className="p-6 space-y-4">
         {/* Header */}
@@ -221,7 +192,7 @@ export function TasksPage() {
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="font-semibold text-lg truncate">{task.id}</h3>
                 <span className={`px-2 py-1 rounded-md text-xs font-medium ${getPriorityColor(task.priority)}`}>
-                  {task.priority}
+                  {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
                 </span>
               </div>
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
@@ -239,7 +210,7 @@ export function TasksPage() {
               {task.progress}%
             </div>
             <div className="text-xs text-muted-foreground uppercase tracking-wide">
-              {task.status.replace('-', ' ')}
+              {task.status.replace('-', ' ').toUpperCase()}
             </div>
           </div>
         </div>
@@ -255,13 +226,10 @@ export function TasksPage() {
         {/* Metadata */}
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-4">
-            <span>Updated: {formatDate(task.updatedAt)}</span>
-            {showCompletedDate && task.completedAt && (
-              <span>Completed: {formatDate(task.completedAt)}</span>
-            )}
+            <span>Updated: {formatDate(task.updated_at)}</span>
           </div>
-          {task.connectedFiles && (
-            <span>{task.connectedFiles.length} file{task.connectedFiles.length !== 1 ? 's' : ''}</span>
+          {task.connected_files && task.connected_files.length > 0 && (
+            <span>{task.connected_files.length} file{task.connected_files.length !== 1 ? 's' : ''}</span>
           )}
         </div>
 
@@ -410,7 +378,7 @@ export function TasksPage() {
               ) : (
                 <div className="space-y-4">
                   {historyTasks.map((task) => (
-                    <TaskCard key={task.id} task={task} showCompletedDate={true} />
+                    <TaskCard key={task.id} task={task} />
                   ))}
                 </div>
               )}

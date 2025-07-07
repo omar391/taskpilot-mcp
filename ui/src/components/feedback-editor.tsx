@@ -5,16 +5,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Edit, Save, X, Copy, ChevronRight, Eye, EyeOff } from 'lucide-react'
-
-interface FeedbackStep {
-  id: string
-  name: string
-  description: string
-  template: string
-  is_global: boolean
-  workspace_id?: string
-  variables?: string[]
-}
+import { type FeedbackStep } from '@/lib/api-client'
 
 interface FeedbackEditorProps {
   feedbackStep: FeedbackStep
@@ -37,13 +28,13 @@ export function FeedbackEditor({
 }: FeedbackEditorProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isTemplateExpanded, setIsTemplateExpanded] = useState(false)
-  const [editedTemplate, setEditedTemplate] = useState(feedbackStep.template)
+  const [editedTemplate, setEditedTemplate] = useState(feedbackStep.template_content)
   const [editedDescription, setEditedDescription] = useState(feedbackStep.description)
 
   const handleSave = () => {
     if (onSave) {
       onSave({
-        template: editedTemplate,
+        template_content: editedTemplate,
         description: editedDescription
       })
     }
@@ -51,7 +42,7 @@ export function FeedbackEditor({
   }
 
   const handleCancel = () => {
-    setEditedTemplate(feedbackStep.template)
+    setEditedTemplate(feedbackStep.template_content)
     setEditedDescription(feedbackStep.description)
     setIsEditing(false)
     if (onCancel) {
@@ -71,7 +62,7 @@ export function FeedbackEditor({
     return [...new Set(matches.map(match => match.replace(/[{}]/g, '').replace('context.', '')))]
   }
 
-  const variables = extractVariables(isEditing ? editedTemplate : feedbackStep.template)
+  const variables = extractVariables(isEditing ? editedTemplate : feedbackStep.template_content)
 
   const commonVariables = [
     'workspace_name',
@@ -194,14 +185,14 @@ export function FeedbackEditor({
               {isTemplateExpanded ? (
                 <div className="p-3 bg-muted rounded-lg">
                   <pre className="text-sm whitespace-pre-wrap font-mono">
-                    {feedbackStep.template}
+                    {feedbackStep.template_content}
                   </pre>
                 </div>
               ) : (
                 <div className="p-3 bg-muted/50 rounded-lg border border-dashed border-muted-foreground/30">
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">
-                      Template content ({feedbackStep.template.split('\n').length} lines)
+                      Template content ({feedbackStep.template_content.split('\n').length} lines)
                     </p>
                     <Button
                       variant="ghost"
