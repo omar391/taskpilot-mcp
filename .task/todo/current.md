@@ -1,24 +1,5 @@
 # Current Tasks
 
-## Task ID: TP-016
-- **Title**: Implement conditional floating navigation (hide on home page)  
-- **Description**: Modify floating navigation to only appear when users are inside workspace pages. Remove floating nav from home page but show it on workspace-specific pages (Tasks, Tool Flows, Feedback Steps).
-- **Priority**: High
-- **Dependencies**: TP-015 ✅ 
-- **Status**: Done
-- **Progress**: 100%
-- **Notes**: ✅ TASK ALREADY COMPLETED as part of TP-015! 
-  
-  The FloatingNav component was updated in TP-015 to be conditional:
-  - Returns `null` on home page (no workspace context)
-  - Shows navigation only when `workspaceId` parameter exists
-  - Verified working through manual testing of routes
-  
-  **Implementation Details:**
-  - Updated `floating-nav.tsx` to check for `workspaceId` parameter
-  - Conditional rendering: workspace context = show nav, home = hide nav
-  - Navigation items dynamically built based on workspace context
-- **Connected File List**: ui/src/components/floating-nav.tsx
 - **Status**: Backlog
 - **Progress**: 0%
 - **Notes**: Update router structure to conditionally render FloatingNav based on current route. Home page should not show floating nav.
