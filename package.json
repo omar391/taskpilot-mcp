@@ -11,12 +11,21 @@
     "build"
   ],
   "scripts": {
-    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "build": "tsc && cp -r src/data build/ && cp src/database/schema.sql build/database/ && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
     "prepare": "bun run build",
     "watch": "tsc --watch",
     "inspector": "bunx @modelcontextprotocol/inspector build/index.js",
     "dev": "bun run watch",
-    "start": "bun run build && node build/index.js"
+    "start": "bun run build && node build/index.js",
+    "ui:dev": "cd ui && bun run dev",
+    "ui:build": "cd ui && bun run build",
+    "ui:lint": "cd ui && bun run lint",
+    "ui:preview": "cd ui && bun run preview",
+    "ui:install": "cd ui && bun install",
+    "dev:ui": "cd ui && bun run dev",
+    "dev:server": "bun run watch",
+    "dev:all": "concurrently \"bun run dev:server\" \"bun run dev:ui\"",
+    "install:all": "bun install && cd ui && bun install"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "0.6.0",
@@ -27,6 +36,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.4",
+    "concurrently": "^9.2.0",
     "typescript": "^5.3.3"
   }
 }
