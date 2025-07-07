@@ -1,11 +1,11 @@
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
 import type { GlobalSeedData, FeedbackStep, ToolFlow } from '../types/index.js';
 import type { DatabaseManager } from '../database/connection.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { 
+  GLOBAL_TOOL_FLOWS_SEED, 
+  GLOBAL_FEEDBACK_STEPS_SEED, 
+  MCP_SERVER_MAPPINGS_SEED 
+} from '../data/embedded-seed-data.js';
 
 export class SeedManager {
   private globalSeedData: GlobalSeedData | null = null;
@@ -13,30 +13,24 @@ export class SeedManager {
   constructor(private db: DatabaseManager) {}
 
   /**
-   * Load global tool flows from JSON file
+   * Load global tool flows from embedded data
    */
   private loadGlobalToolFlows(): any {
-    const flowsPath = join(__dirname, '..', 'data', 'global-tool-flows-db-seed.json');
-    const flowsContent = readFileSync(flowsPath, 'utf8');
-    return JSON.parse(flowsContent);
+    return GLOBAL_TOOL_FLOWS_SEED;
   }
 
   /**
-   * Load global feedback steps from JSON file
+   * Load global feedback steps from embedded data
    */
   private loadGlobalFeedbackSteps(): any {
-    const stepsPath = join(__dirname, '..', 'data', 'global-feedback-steps-db-seed.json');
-    const stepsContent = readFileSync(stepsPath, 'utf8');
-    return JSON.parse(stepsContent);
+    return GLOBAL_FEEDBACK_STEPS_SEED;
   }
 
   /**
-   * Load MCP server mappings from JSON file
+   * Load MCP server mappings from embedded data
    */
   private loadMCPServerMappings(): any {
-    const mappingsPath = join(__dirname, '..', 'data', 'mcp-server-mappings-seed.json');
-    const mappingsContent = readFileSync(mappingsPath, 'utf8');
-    return JSON.parse(mappingsContent);
+    return MCP_SERVER_MAPPINGS_SEED;
   }
 
   /**
