@@ -283,22 +283,24 @@ export function TasksPage() {
         </div>
       )}
 
-      {/* Modern Tabs */}
+      {/* Modern Tabs with Enhanced Mobile Support */}
       <Tabs defaultValue="current" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 rounded-2xl p-1 bg-muted/30">
+        <TabsList className="grid w-full grid-cols-2 rounded-2xl p-1 bg-muted/30 h-12">
           <TabsTrigger 
             value="current" 
-            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200 hover:bg-background/50 px-3 py-2 text-sm font-medium"
           >
-            <Clock size={16} />
-            Current ({currentTasks.length})
+            <Clock size={16} className="flex-shrink-0" />
+            <span className="hidden sm:inline">Current ({currentTasks.length})</span>
+            <span className="sm:hidden">Current</span>
           </TabsTrigger>
           <TabsTrigger 
             value="history" 
-            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200 hover:bg-background/50 px-3 py-2 text-sm font-medium"
           >
-            <CheckCircle size={16} />
-            History ({historyTasks.length})
+            <CheckCircle size={16} className="flex-shrink-0" />
+            <span className="hidden sm:inline">History ({historyTasks.length})</span>
+            <span className="sm:hidden">History</span>
           </TabsTrigger>
         </TabsList>
 

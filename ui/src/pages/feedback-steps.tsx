@@ -265,22 +265,24 @@ Ready to implement. Proceed with systematic approach.`,
         </div>
       )}
 
-      {/* Modern Tabs */}
+      {/* Modern Tabs with Enhanced Mobile Support */}
       <Tabs defaultValue="global" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 rounded-2xl p-1 bg-muted/30">
+        <TabsList className="grid w-full grid-cols-2 rounded-2xl p-1 bg-muted/30 h-12">
           <TabsTrigger 
             value="global" 
-            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200 hover:bg-background/50 px-3 py-2 text-sm font-medium"
           >
-            <Globe size={16} />
-            Global
+            <Globe size={16} className="flex-shrink-0" />
+            <span className="hidden sm:inline">Global</span>
+            <span className="sm:hidden">Global</span>
           </TabsTrigger>
           <TabsTrigger 
             value="workspace" 
-            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
+            className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200 hover:bg-background/50 px-3 py-2 text-sm font-medium"
           >
-            <Building size={16} />
-            Workspace
+            <Building size={16} className="flex-shrink-0" />
+            <span className="hidden sm:inline">Workspace</span>
+            <span className="sm:hidden">Work</span>
           </TabsTrigger>
         </TabsList>
 
