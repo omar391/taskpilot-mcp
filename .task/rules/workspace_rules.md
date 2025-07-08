@@ -40,6 +40,14 @@ TP-XXX: Brief description
 - Any breaking changes noted
 ```
 
+### Git Commit Best Practices
+- **NEVER use multi-line commit messages with special characters in terminal**
+- Use single-line commit messages for terminal commits: `git commit -m "message"`
+- For complex commits, write commit message in editor: `git commit` (opens editor)
+- Avoid quotes, backticks, emojis in terminal commit messages
+- Keep terminal commit messages under 80 characters
+- Use `git commit --file=message.txt` for pre-written complex messages
+
 ### PR Process
 - Link to task ID in PR description
 - Require code review before merge
