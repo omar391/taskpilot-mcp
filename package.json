@@ -11,9 +11,14 @@
     "build"
   ],
   "scripts": {
-    "build": "tsc && cd ui && bun run build && node -e \"require('fs').chmodSync('../build/index.js', '755')\"",
+    "build": "rsbuild build && cd ui && bun run build && cd .. && chmod +x build/index.js",
+    "build:server": "rsbuild build",
+    "build:ui": "cd ui && bun run build",
     "dev": "npx tsx --watch src/index.ts",
-    "serve": "npm run build && node build/index.js --port=8989"
+    "serve": "npm run build && node build/index.js --port=8989",
+    "lint": "tsc --noEmit && cd ui && tsc --noEmit",
+    "lint:server": "tsc --noEmit",
+    "lint:ui": "cd ui && tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "0.6.0",
@@ -26,6 +31,7 @@
     "zod": "^3.25.74"
   },
   "devDependencies": {
+    "@rsbuild/core": "^1.4.5",
     "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.3",
     "@types/node": "^20.19.4",

@@ -22,8 +22,13 @@
 
 ### 📊 **Development Commands**:
 - `npm run dev` - Development with hot reload (tsx --watch)
+- `npm run build` - Build both server and UI using rsbuild
+- `npm run build:server` - Build server only with rsbuild
+- `npm run build:ui` - Build UI only with rsbuild  
 - `npm run serve` - Production server on port 8989 (builds first)
-- `npm run build` - Build both server and UI assets
+- `npm run lint` - Type check both server and UI
+- `npm run lint:server` - Type check server only
+- `npm run lint:ui` - Type check UI only
 
 ### � **Access Points**:
 - **Web UI**: http://localhost:8989/
