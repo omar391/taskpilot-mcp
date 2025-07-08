@@ -13,7 +13,7 @@
   "scripts": {
     "build": "tsc && cd ui && bun run build && node -e \"require('fs').chmodSync('../build/index.js', '755')\"",
     "dev": "npx tsx --watch src/index.ts",
-    "serve": "node build/index.js --port=8989"
+    "serve": "npm run build && node build/index.js --port=8989"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "0.6.0",
