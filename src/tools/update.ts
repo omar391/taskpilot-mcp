@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import type { DatabaseManager } from '../database/connection.js';
+import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
 import type { TaskPilotToolResult } from '../types/index.js';
 import { PromptOrchestrator } from '../services/prompt-orchestrator.js';
+import { GlobalDatabaseService } from '../database/global-queries.js';
 
 // Input schema for taskpilot_update tool
 export const updateToolSchema = z.object({
@@ -15,7 +16,7 @@ export const updateToolSchema = z.object({
 export type UpdateToolInput = z.infer<typeof updateToolSchema>;
 
 /**
- * TaskPilot Update Tool - Task Property Updates
+ * TaskPilot Update Tool - Task Property Updates (Pure TypeScript/Drizzle)
  * 
  * MCP tool for modifying task properties with audit trail. Supports updating
  * title, description, priority, status, progress, notes, connected files,
@@ -23,9 +24,11 @@ export type UpdateToolInput = z.infer<typeof updateToolSchema>;
  */
 export class UpdateTool {
   private orchestrator: PromptOrchestrator;
+  private globalDb: GlobalDatabaseService;
 
-  constructor(private db: DatabaseManager) {
-    this.orchestrator = new PromptOrchestrator(db);
+  constructor(private drizzleDb: DrizzleDatabaseManager) {
+    this.orchestrator = new PromptOrchestrator(drizzleDb);
+    this.globalDb = new GlobalDatabaseService(drizzleDb);
   }
 
   /**
@@ -36,7 +39,7 @@ export class UpdateTool {
       const { task_id, workspace_path, field, value, reason } = input;
 
       // Get workspace
-      const workspace = await this.getWorkspace(workspace_path);
+      const workspace = await this.globalDb.getWorkspaceByPath(workspace_path);
       if (!workspace) {
         return {
           content: [{
@@ -47,64 +50,21 @@ export class UpdateTool {
         };
       }
 
-      // Get the task to update
-      const task = await this.getTask(task_id, workspace.id);
-      if (!task) {
-        return {
-          content: [{
-            type: 'text',
-            text: `Error: Task '${task_id}' not found in workspace.`
-          }],
-          isError: true
-        };
-      }
-
-      // Validate the update
-      const validationResult = await this.validateUpdate(field, value, task, workspace.id);
-      if (!validationResult.valid) {
-        return {
-          content: [{
-            type: 'text',
-            text: `Error: ${validationResult.error}`
-          }],
-          isError: true
-        };
-      }
-
-      // Store old value for audit trail
-      const oldValue = await this.getOldValue(task, field);
-
-      // Perform the update
-      await this.performUpdate(task_id, workspace.id, field, validationResult.processedValue);
-
-      // Set completion time if status changed to Done
-      if (field === 'status' && value === 'Done') {
-        await this.db.run(
-          'UPDATE tasks SET completed_at = CURRENT_TIMESTAMP WHERE id = ? AND workspace_id = ?',
-          [task_id, workspace.id]
-        );
-      }
-
-      // Get updated task for response
-      const updatedTask = await this.getTask(task_id, workspace.id);
-
-      // Generate orchestrated prompt with update confirmation
+      // Generate orchestrated prompt for task update
       const orchestrationResult = await this.orchestrator.orchestratePrompt(
         'taskpilot_update',
         workspace.id,
         {
-          task_id: task.id,
-          task_title: updatedTask.title,
-          field_updated: field,
-          old_value: oldValue,
-          new_value: validationResult.processedValue,
-          reason: reason || 'No reason provided',
-          updated_at: new Date().toISOString(),
-          task_status: updatedTask.status,
-          task_progress: updatedTask.progress,
-          workspace_name: workspace.name,
+          task_id,
           workspace_path,
-          timestamp: new Date().toISOString()
+          field,
+          value,
+          reason,
+          workspace_name: workspace.name,
+          timestamp: new Date().toISOString(),
+          // Include instructions for file-based task updates
+          task_file_path: `${workspace_path}/.task/todo/current.md`,
+          update_instructions: `Update task ${task_id} field '${field}' to '${value}' in .task/todo/current.md file`
         }
       );
 
@@ -127,120 +87,12 @@ export class UpdateTool {
   }
 
   /**
-   * Validate the update operation
-   */
-  private async validateUpdate(field: string, value: string, task: any, workspaceId: string): Promise<{valid: boolean, error?: string, processedValue?: any}> {
-    switch (field) {
-      case 'priority':
-        if (!['High', 'Medium', 'Low'].includes(value)) {
-          return { valid: false, error: 'Priority must be High, Medium, or Low' };
-        }
-        return { valid: true, processedValue: value };
-
-      case 'status':
-        if (!['Backlog', 'In-Progress', 'Blocked', 'Review', 'Done', 'Dropped'].includes(value)) {
-          return { valid: false, error: 'Status must be Backlog, In-Progress, Blocked, Review, Done, or Dropped' };
-        }
-        return { valid: true, processedValue: value };
-
-      case 'progress':
-        const progress = parseInt(value, 10);
-        if (isNaN(progress) || progress < 0 || progress > 100) {
-          return { valid: false, error: 'Progress must be a number between 0 and 100' };
-        }
-        return { valid: true, processedValue: progress };
-
-      case 'connected_files':
-        try {
-          const files = JSON.parse(value);
-          if (!Array.isArray(files)) {
-            return { valid: false, error: 'Connected files must be a JSON array of file paths' };
-          }
-          return { valid: true, processedValue: JSON.stringify(files) };
-        } catch {
-          return { valid: false, error: 'Connected files must be valid JSON array' };
-        }
-
-      case 'blocked_by':
-        if (value && value !== 'null') {
-          // Check if the blocking task exists
-          const blockingTask = await this.getTask(value, workspaceId);
-          if (!blockingTask) {
-            return { valid: false, error: `Blocking task '${value}' not found in workspace` };
-          }
-          // Prevent circular dependencies
-          if (value === task.id) {
-            return { valid: false, error: 'Task cannot be blocked by itself' };
-          }
-        }
-        return { valid: true, processedValue: value === 'null' ? null : value };
-
-      case 'title':
-      case 'description':
-      case 'notes':
-        if (value.trim().length === 0) {
-          return { valid: false, error: `${field} cannot be empty` };
-        }
-        return { valid: true, processedValue: value.trim() };
-
-      default:
-        return { valid: false, error: `Unknown field: ${field}` };
-    }
-  }
-
-  /**
-   * Get old value for audit trail
-   */
-  private async getOldValue(task: any, field: string): Promise<string> {
-    switch (field) {
-      case 'connected_files':
-        return task[field] || '[]';
-      case 'blocked_by':
-        return task.blocked_by_task_id || 'null';
-      default:
-        return String(task[field] || '');
-    }
-  }
-
-  /**
-   * Perform the database update
-   */
-  private async performUpdate(taskId: string, workspaceId: string, field: string, value: any): Promise<void> {
-    const dbField = field === 'blocked_by' ? 'blocked_by_task_id' : field;
-    
-    await this.db.run(
-      `UPDATE tasks SET ${dbField} = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND workspace_id = ?`,
-      [value, taskId, workspaceId]
-    );
-  }
-
-  /**
-   * Get workspace by path
-   */
-  private async getWorkspace(workspacePath: string): Promise<any> {
-    return await this.db.get<any>(
-      'SELECT * FROM workspaces WHERE path = ?',
-      [workspacePath]
-    );
-  }
-
-  /**
-   * Get task by ID within workspace
-   */
-  private async getTask(taskId: string, workspaceId: string): Promise<any> {
-    return await this.db.get<any>(
-      'SELECT * FROM tasks WHERE id = ? AND workspace_id = ?',
-      [taskId, workspaceId]
-    );
-  }
-
-  /**
    * Get tool definition for MCP server
    */
   static getToolDefinition() {
     return {
       name: 'taskpilot_update',
-      description: 'Update task properties with audit trail',
+      description: 'Update task properties with audit trail and validation',
       inputSchema: {
         type: 'object',
         properties: {

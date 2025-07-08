@@ -61,14 +61,9 @@ export class DrizzleDatabaseManager {
         });
       }
 
-      // Run migrations if available
-      try {
-        await this.runMigrations();
-      } catch (error) {
-        console.warn('No migrations available or migration failed:', error);
-        // If migrations fail, create tables manually using embedded schema
-        await this.createTablesManually();
-      }
+      // For pure TypeScript approach, use programmatic migrations instead of file-based migrations
+      console.log('Running programmatic database migrations...');
+      await this.runProgrammaticMigrations();
 
       this.isInitialized = true;
       console.log(`${this.dbType} database initialized successfully at ${this.dbPath}`);
@@ -94,9 +89,10 @@ export class DrizzleDatabaseManager {
   }
 
   /**
-   * Create tables manually using embedded schema (fallback)
+   * Run programmatic migrations (pure TypeScript approach)
+   * This creates schema programmatically instead of using file-based migrations
    */
-  private async createTablesManually(): Promise<void> {
+  private async runProgrammaticMigrations(): Promise<void> {
     if (!this.sqlite) {
       throw new Error('SQLite connection not available');
     }

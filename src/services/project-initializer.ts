@@ -1,7 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { DatabaseManager } from '../database/connection.js';
+import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
+import { getGlobalDatabase } from '../database/drizzle-connection.js';
 import type { Task } from '../types/index.js';
 import { SeedManager } from './seed-manager.js';
+import { workspaces, sessions, type Workspace, type NewWorkspace, type NewSession } from '../database/schema/global-schema.js';
+import { tasks, workspaceFeedbackSteps, type Task as DrizzleTask, type NewTask, type NewWorkspaceFeedbackStep } from '../database/schema/workspace-schema.js';
+import { eq, and, desc, sql } from 'drizzle-orm';
 
 // Database representation of Task (with JSON fields as strings)
 interface DatabaseTask {
@@ -50,8 +55,8 @@ export interface ProjectInitializationResult {
 export class ProjectInitializer {
   private seedManager: SeedManager;
 
-  constructor(private db: DatabaseManager) {
-    this.seedManager = new SeedManager(db);
+  constructor(private drizzleManager: DrizzleDatabaseManager) {
+    this.seedManager = new SeedManager(drizzleManager);
   }
 
   /**
@@ -91,43 +96,57 @@ export class ProjectInitializer {
   /**
    * Ensure workspace exists, create if necessary
    */
-  private async ensureWorkspace(workspacePath: string, projectName: string): Promise<any> {
+  private async ensureWorkspace(workspacePath: string, projectName: string): Promise<Workspace> {
+    const globalDb = getGlobalDatabase();
+
     // Check if workspace already exists
-    let workspace = await this.db.get<any>(
-      'SELECT * FROM workspaces WHERE path = ?',
-      [workspacePath]
-    );
+    let workspace = await globalDb.getDb().select()
+      .from(workspaces)
+      .where(eq(workspaces.path, workspacePath))
+      .get();
 
     if (!workspace) {
       // Create new workspace
       const workspaceId = uuidv4();
+      const currentTime = new Date().toISOString();
       
-      await this.db.run(
-        `INSERT INTO workspaces (id, path, name, created_at, updated_at, last_activity, is_active)
-         VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)`,
-        [workspaceId, workspacePath, projectName]
-      );
+      const newWorkspaceData: NewWorkspace = {
+        id: workspaceId,
+        path: workspacePath,
+        name: projectName,
+        status: 'active',
+        createdAt: currentTime,
+        updatedAt: currentTime,
+        lastActivity: currentTime,
+        taskCount: 0
+      };
 
-      workspace = await this.db.get<any>(
-        'SELECT * FROM workspaces WHERE id = ?',
-        [workspaceId]
-      );
+      await globalDb.getDb().insert(workspaces).values(newWorkspaceData);
+
+      workspace = await globalDb.getDb().select()
+        .from(workspaces)
+        .where(eq(workspaces.id, workspaceId))
+        .get();
     } else {
       // Update existing workspace
-      await this.db.run(
-        `UPDATE workspaces 
-         SET name = ?, is_active = 1, last_activity = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP 
-         WHERE id = ?`,
-        [projectName, workspace.id]
-      );
+      const currentTime = new Date().toISOString();
       
-      workspace = await this.db.get<any>(
-        'SELECT * FROM workspaces WHERE id = ?',
-        [workspace.id]
-      );
+      await globalDb.getDb().update(workspaces)
+        .set({
+          name: projectName,
+          status: 'active',
+          lastActivity: currentTime,
+          updatedAt: currentTime
+        })
+        .where(eq(workspaces.id, workspace.id));
+
+      workspace = await globalDb.getDb().select()
+        .from(workspaces)
+        .where(eq(workspaces.id, workspace.id))
+        .get();
     }
 
-    return workspace;
+    return workspace!;
   }
 
   /**
@@ -199,31 +218,48 @@ export class ProjectInitializer {
       });
     }
 
-    // Insert tasks into database
+    // Insert tasks into database using Drizzle
     const createdTasks: Task[] = [];
     for (const task of initialTasks) {
-      await this.db.run(
-        `INSERT INTO tasks (
-          id, title, description, priority, status, progress, 
-          workspace_id, connected_files, notes, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-        [
-          task.id, task.title, task.description, task.priority, task.status,
-          task.progress, task.workspace_id, task.connected_files, task.notes
-        ]
-      );
+      const taskData: NewTask = {
+        id: task.id!,
+        title: task.title!,
+        description: task.description,
+        priority: (task.priority as 'High' | 'Medium' | 'Low')?.toLowerCase() as 'high' | 'medium' | 'low' || 'medium',
+        status: (task.status as 'Backlog' | 'In-Progress' | 'Blocked' | 'Review' | 'Done' | 'Dropped')?.toLowerCase().replace('-', '-') as 'backlog' | 'in-progress' | 'blocked' | 'review' | 'done' | 'dropped' || 'backlog',
+        progress: task.progress || 0,
+        dependencies: [],
+        notes: task.notes,
+        connectedFiles: task.connected_files ? JSON.parse(task.connected_files) : []
+      };
 
-      // Fetch the created task and convert to proper Task type
-      const dbTask = await this.db.get<DatabaseTask>(
-        'SELECT * FROM tasks WHERE id = ?',
-        [task.id]
-      );
+      await this.drizzleManager.getDb().insert(tasks).values(taskData);
+
+      // Fetch the created task
+      const dbTask = await this.drizzleManager.getDb().select()
+        .from(tasks)
+        .where(eq(tasks.id, task.id!))
+        .get();
       
       if (dbTask) {
-        // Convert database task to API task format
+        // Convert database task to API task format - mapping Drizzle types to legacy API types
         const apiTask: Task = {
-          ...dbTask,
-          connected_files: JSON.parse(dbTask.connected_files || '[]')
+          id: dbTask.id,
+          title: dbTask.title,
+          description: dbTask.description || undefined,
+          priority: (dbTask.priority ?
+            (dbTask.priority.charAt(0).toUpperCase() + dbTask.priority.slice(1)) as 'High' | 'Medium' | 'Low'
+            : 'Medium'),
+          status: (dbTask.status ?
+            dbTask.status.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('-') as 'Backlog' | 'In-Progress' | 'Blocked' | 'Review' | 'Done' | 'Dropped'
+            : 'Backlog'),
+          progress: dbTask.progress || 0,
+          connected_files: Array.isArray(dbTask.connectedFiles) ? dbTask.connectedFiles : [],
+          notes: dbTask.notes || undefined,
+          workspace_id: workspaceId, // Add workspace_id from method parameter
+          created_at: dbTask.createdAt || new Date().toISOString(),
+          updated_at: dbTask.updatedAt || new Date().toISOString(),
+          completed_at: dbTask.completedAt || undefined
         };
         createdTasks.push(apiTask);
       }
@@ -300,22 +336,20 @@ export class ProjectInitializer {
 
 *These rules evolve based on project needs and team feedback.*`;
 
-      // Create workspace_rules feedback step
-      await this.db.run(
-        `INSERT INTO feedback_steps (id, name, instructions, workspace_id, metadata, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-        [
-          uuidv4(),
-          'workspace_rules',
-          workspaceRulesInstructions,
-          workspaceId,
-          JSON.stringify({
-            category: 'workspace_guidelines',
-            tech_stack: techStack,
-            auto_generated: true
-          })
-        ]
-      );
+      // Create workspace_rules feedback step using Drizzle
+      const feedbackStepData: NewWorkspaceFeedbackStep = {
+        id: uuidv4(),
+        name: 'workspace_rules',
+        description: 'Workspace-specific development rules and guidelines',
+        templateContent: workspaceRulesInstructions,
+        variableSchema: {
+          category: 'workspace_guidelines',
+          tech_stack: techStack,
+          auto_generated: true
+        }
+      };
+
+      await this.drizzleManager.getDb().insert(workspaceFeedbackSteps).values(feedbackStepData);
 
       return true;
     } catch (error) {
@@ -328,19 +362,26 @@ export class ProjectInitializer {
    * Create initial session for the workspace
    */
   private async createInitialSession(workspaceId: string): Promise<void> {
-    // Deactivate any existing sessions
-    await this.db.run(
-      'UPDATE sessions SET is_active = 0 WHERE workspace_id = ?',
-      [workspaceId]
-    );
+    const globalDb = getGlobalDatabase();
 
-    // Create new session
+    // Deactivate any existing sessions using Drizzle
+    await globalDb.getDb().update(sessions)
+      .set({ isActive: false })
+      .where(eq(sessions.workspaceId, workspaceId));
+
+    // Create new session using Drizzle
     const sessionId = uuidv4();
-    await this.db.run(
-      `INSERT INTO sessions (id, workspace_id, created_at, last_activity, is_active)
-       VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)`,
-      [sessionId, workspaceId]
-    );
+    const currentTime = new Date().toISOString();
+
+    const sessionData: NewSession = {
+      id: sessionId,
+      workspaceId: workspaceId,
+      createdAt: currentTime,
+      lastActivity: currentTime,
+      isActive: true
+    };
+
+    await globalDb.getDb().insert(sessions).values(sessionData);
   }
 
   /**
@@ -357,37 +398,40 @@ export class ProjectInitializer {
    * Check if workspace is already initialized
    */
   async isWorkspaceInitialized(workspacePath: string): Promise<boolean> {
-    const workspace = await this.db.get<any>(
-      'SELECT * FROM workspaces WHERE path = ?',
-      [workspacePath]
-    );
+    const globalDb = getGlobalDatabase();
+
+    const workspace = await globalDb.getDb().select()
+      .from(workspaces)
+      .where(eq(workspaces.path, workspacePath))
+      .get();
 
     if (!workspace) {
       return false;
     }
 
-    // Check if workspace has tasks and rules
-    const taskCount = await this.db.get<{ count: number }>(
-      'SELECT COUNT(*) as count FROM tasks WHERE workspace_id = ?',
-      [workspace.id]
-    );
+    // Check if workspace has tasks and rules using workspace database
+    const taskCountResult = await this.drizzleManager.getDb().select({ count: sql<number>`COUNT(*)` })
+      .from(tasks)
+      .get();
 
-    const workspaceRules = await this.db.get<any>(
-      'SELECT * FROM feedback_steps WHERE name = ? AND workspace_id = ?',
-      ['workspace_rules', workspace.id]
-    );
+    const workspaceRules = await this.drizzleManager.getDb().select()
+      .from(workspaceFeedbackSteps)
+      .where(eq(workspaceFeedbackSteps.name, 'workspace_rules'))
+      .get();
 
-    return (taskCount?.count || 0) > 0 && !!workspaceRules;
+    return (taskCountResult?.count || 0) > 0 && !!workspaceRules;
   }
 
   /**
    * Reinitialize existing workspace (useful for project updates)
    */
   async reinitializeWorkspace(workspacePath: string, preserveTasks: boolean = true): Promise<ProjectInitializationResult> {
-    const workspace = await this.db.get<any>(
-      'SELECT * FROM workspaces WHERE path = ?',
-      [workspacePath]
-    );
+    const globalDb = getGlobalDatabase();
+
+    const workspace = await globalDb.getDb().select()
+      .from(workspaces)
+      .where(eq(workspaces.path, workspacePath))
+      .get();
 
     if (!workspace) {
       throw new Error(`Workspace not found: ${workspacePath}`);
@@ -396,19 +440,32 @@ export class ProjectInitializer {
     // Preserve existing tasks if requested
     let existingTasks: Task[] = [];
     if (preserveTasks) {
-      const dbTasks = await this.db.all<DatabaseTask>(
-        'SELECT * FROM tasks WHERE workspace_id = ?',
-        [workspace.id]
-      );
+      const dbTasks = await this.drizzleManager.getDb().select()
+        .from(tasks)
+        .all();
       
       // Convert database tasks to API format
-      existingTasks = dbTasks.map(dbTask => ({
-        ...dbTask,
-        connected_files: JSON.parse(dbTask.connected_files || '[]')
+      existingTasks = dbTasks.map((dbTask: DrizzleTask) => ({
+        id: dbTask.id,
+        title: dbTask.title,
+        description: dbTask.description || undefined,
+        priority: (dbTask.priority ?
+          (dbTask.priority.charAt(0).toUpperCase() + dbTask.priority.slice(1)) as 'High' | 'Medium' | 'Low'
+          : 'Medium'),
+        status: (dbTask.status ?
+          dbTask.status.split('-').map((word: string) => word.charAt(0).toUpperCase() + word.slice(1)).join('-') as 'Backlog' | 'In-Progress' | 'Blocked' | 'Review' | 'Done' | 'Dropped'
+          : 'Backlog'),
+        progress: dbTask.progress || 0,
+        connected_files: Array.isArray(dbTask.connectedFiles) ? dbTask.connectedFiles : [],
+        notes: dbTask.notes || undefined,
+        workspace_id: workspace.id,
+        created_at: dbTask.createdAt || new Date().toISOString(),
+        updated_at: dbTask.updatedAt || new Date().toISOString(),
+        completed_at: dbTask.completedAt || undefined
       }));
     } else {
       // Clear existing tasks
-      await this.db.run('DELETE FROM tasks WHERE workspace_id = ?', [workspace.id]);
+      await this.drizzleManager.getDb().delete(tasks);
     }
 
     // Update workspace rules

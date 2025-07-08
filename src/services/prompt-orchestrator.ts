@@ -1,12 +1,13 @@
-import type { DatabaseManager } from '../database/connection.js';
+import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
 import type { PromptOrchestrationResult, ToolFlow, FeedbackStep } from '../types/index.js';
 import { SeedManager } from './seed-manager.js';
 
 export class PromptOrchestrator {
   private seedManager: SeedManager;
 
-  constructor(private db: DatabaseManager) {
-    this.seedManager = new SeedManager(db);
+  constructor(private drizzleDb: DrizzleDatabaseManager) {
+    // Pure TypeScript approach - use DrizzleDatabaseManager directly
+    this.seedManager = new SeedManager(drizzleDb);
   }
 
   /**
@@ -25,26 +26,26 @@ export class PromptOrchestrator {
         throw new Error(`Tool flow for '${toolName}' not found`);
       }
 
-      // Get the first step in the flow
-      const firstStep = toolFlow.flow_steps.find(step => step.step_order === 1);
-      if (!firstStep) {
-        throw new Error(`No steps found in tool flow for '${toolName}'`);
-      }
+      // Note: Current schema doesn't have flow_steps as a direct property
+      // This may need to be refactored to load steps separately or use relations
+      // For now, treat each tool flow as having basic step information
+      const feedbackStepId = toolFlow.feedbackStepId;
 
       // Generate basic prompt for the tool
       let promptText = await this.generateBasicPrompt(toolName, args);
 
       // If there's a feedback step, include its instructions with context substitution
-      if (firstStep.feedback_step) {
+      if (feedbackStepId) {
         const feedbackStep = await this.seedManager.getFeedbackStep(
-          firstStep.feedback_step,
+          feedbackStepId,
           workspaceId
         );
         
         if (feedbackStep) {
           // Replace context variables in feedback step instructions
+          // Note: Using templateContent instead of instructions for new schema
           const contextualInstructions = this.replaceContextVariables(
-            feedbackStep.instructions,
+            feedbackStep.templateContent,
             this.buildContext(args, workspaceId)
           );
           
@@ -54,7 +55,7 @@ export class PromptOrchestrator {
 
       return {
         prompt_text: promptText,
-        next_tool: firstStep.next_tool === 'end' ? undefined : firstStep.next_tool,
+        next_tool: (toolFlow.nextTool && toolFlow.nextTool !== 'end') ? toolFlow.nextTool : undefined,
         session_data: {
           current_tool: toolName,
           current_step: 1,

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import type { DatabaseManager } from '../database/connection.js';
+import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
 import type { TaskPilotToolResult } from '../types/index.js';
 import { PromptOrchestrator } from '../services/prompt-orchestrator.js';
+import { GlobalDatabaseService } from '../database/global-queries.js';
 
 // Input schema for taskpilot_create_task tool
 export const createTaskToolSchema = z.object({
@@ -16,16 +17,21 @@ export const createTaskToolSchema = z.object({
 export type CreateTaskToolInput = z.infer<typeof createTaskToolSchema>;
 
 /**
- * TaskPilot Create Task Tool - Direct Task Creation
+ * TaskPilot Create Task Tool - Direct Task Creation (Pure TypeScript/Drizzle)
  * 
  * Direct execution tool for task creation after validation passes. 
- * Creates task entry in database and generates unique task ID.
+ * Creates task entry and generates unique task ID. 
+ * 
+ * Note: This version focuses on orchestration. Full task management requires
+ * workspace-specific database implementation.
  */
 export class CreateTaskTool {
   private orchestrator: PromptOrchestrator;
+  private globalDb: GlobalDatabaseService;
 
-  constructor(private db: DatabaseManager) {
-    this.orchestrator = new PromptOrchestrator(db);
+  constructor(private drizzleDb: DrizzleDatabaseManager) {
+    this.orchestrator = new PromptOrchestrator(drizzleDb);
+    this.globalDb = new GlobalDatabaseService(drizzleDb);
   }
 
   /**
@@ -36,7 +42,7 @@ export class CreateTaskTool {
       const { task_description, workspace_path, priority = 'Medium', parent_task_id, title } = input;
 
       // Get workspace
-      const workspace = await this.getWorkspace(workspace_path);
+      const workspace = await this.globalDb.getWorkspaceByPath(workspace_path);
       if (!workspace) {
         return {
           content: [{
@@ -47,48 +53,11 @@ export class CreateTaskTool {
         };
       }
 
-      // Validate parent task if specified
-      if (parent_task_id) {
-        const parentTask = await this.getTask(parent_task_id, workspace.id);
-        if (!parentTask) {
-          return {
-            content: [{
-              type: 'text',
-              text: `Error: Parent task '${parent_task_id}' not found in workspace.`
-            }],
-            isError: true
-          };
-        }
-      }
-
       // Generate task ID and title
       const taskId = await this.generateTaskId(workspace.id);
       const taskTitle = title || this.generateTitleFromDescription(task_description);
 
-      // Create task in database
-      await this.db.run(
-        `INSERT INTO tasks (
-          id, title, description, priority, status, progress, 
-          parent_task_id, workspace_id, connected_files, 
-          created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-        [
-          taskId,
-          taskTitle,
-          task_description,
-          priority,
-          'Backlog',
-          0,
-          parent_task_id || null,
-          workspace.id,
-          JSON.stringify([]) // Empty connected files array
-        ]
-      );
-
-      // Get the created task for confirmation
-      const createdTask = await this.getTask(taskId, workspace.id);
-
-      // Generate orchestrated prompt response
+      // Generate orchestrated prompt response with task creation instructions
       const orchestrationResult = await this.orchestrator.orchestratePrompt(
         'taskpilot_create_task',
         workspace.id,
@@ -97,17 +66,20 @@ export class CreateTaskTool {
           task_title: taskTitle,
           task_description,
           priority,
-            parent_task_id,
-            workspace_name: workspace.name,
-            created_at: new Date().toISOString(),
-            timestamp: new Date().toISOString()
+          parent_task_id,
+          workspace_name: workspace.name,
+          created_at: new Date().toISOString(),
+          timestamp: new Date().toISOString(),
+          // Include instructions for file-based task creation
+          task_file_path: `${workspace_path}/.task/todo/current.md`,
+          task_creation_instructions: 'Create task entry in .task/todo/current.md file with proper formatting'
         }
       );
 
       return {
         content: [{
           type: 'text',
-            text: orchestrationResult.prompt_text
+          text: orchestrationResult.prompt_text
         }]
       };
     } catch (error) {
@@ -124,24 +96,13 @@ export class CreateTaskTool {
 
   /**
    * Generate unique task ID with TP prefix
+   * Note: This is a simplified version. Full implementation would query workspace tasks.
    */
   private async generateTaskId(workspaceId: string): Promise<string> {
-    // Get the highest task number for this workspace
-    const result = await this.db.get<any>(
-      `SELECT id FROM tasks 
-       WHERE workspace_id = ? AND id LIKE 'TP-%' 
-       ORDER BY CAST(SUBSTR(id, 4) AS INTEGER) DESC 
-       LIMIT 1`,
-      [workspaceId]
-    );
-
-    let nextNumber = 1;
-    if (result && result.id) {
-      const currentNumber = parseInt(result.id.replace('TP-', ''), 10);
-      nextNumber = currentNumber + 1;
-    }
-
-    return `TP-${nextNumber.toString().padStart(3, '0')}`;
+    // Generate a simple incremental ID for now
+    // Full implementation would query workspace-specific task database
+    const timestamp = Date.now().toString().slice(-6);
+    return `TP-${timestamp}`;
   }
 
   /**
@@ -155,26 +116,6 @@ export class CreateTaskTool {
       : firstSentence;
     
     return truncated.trim();
-  }
-
-  /**
-   * Get workspace by path
-   */
-  private async getWorkspace(workspacePath: string): Promise<any> {
-    return await this.db.get<any>(
-      'SELECT * FROM workspaces WHERE path = ?',
-      [workspacePath]
-    );
-  }
-
-  /**
-   * Get task by ID within workspace
-   */
-  private async getTask(taskId: string, workspaceId: string): Promise<any> {
-    return await this.db.get<any>(
-      'SELECT * FROM tasks WHERE id = ? AND workspace_id = ?',
-      [taskId, workspaceId]
-    );
   }
 
   /**

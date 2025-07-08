@@ -1,8 +1,10 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import type { DatabaseManager } from '../database/connection.js';
+import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
 import type { TaskPilotToolResult } from '../types/index.js';
 import { PromptOrchestrator } from '../services/prompt-orchestrator.js';
+import { GlobalDatabaseService } from '../database/global-queries.js';
+import type { NewWorkspace, NewSession } from '../database/schema/global-schema.js';
 
 // Input schema for taskpilot_start tool
 export const startToolSchema = z.object({
@@ -12,7 +14,7 @@ export const startToolSchema = z.object({
 export type StartToolInput = z.infer<typeof startToolSchema>;
 
 /**
- * TaskPilot Start Tool - Session Initiation
+ * TaskPilot Start Tool - Session Initiation (Pure TypeScript/Drizzle)
  * 
  * Core MCP tool that initiates workspace sessions and returns comprehensive 
  * prompt_text for LLM context. Includes workspace setup, active task 
@@ -20,9 +22,11 @@ export type StartToolInput = z.infer<typeof startToolSchema>;
  */
 export class StartTool {
   private orchestrator: PromptOrchestrator;
+  private globalDb: GlobalDatabaseService;
 
-  constructor(private db: DatabaseManager) {
-    this.orchestrator = new PromptOrchestrator(db);
+  constructor(private drizzleDb: DrizzleDatabaseManager) {
+    this.orchestrator = new PromptOrchestrator(drizzleDb);
+    this.globalDb = new GlobalDatabaseService(drizzleDb);
   }
 
   /**
@@ -55,7 +59,7 @@ export class StartTool {
       );
 
       // Update workspace activity
-      await this.updateWorkspaceActivity(workspace.id);
+      await this.globalDb.updateWorkspaceActivity(workspace.id);
 
       return {
         content: [{
@@ -80,32 +84,29 @@ export class StartTool {
    */
   private async ensureWorkspace(workspacePath: string): Promise<any> {
     // Check if workspace already exists
-    let workspace = await this.db.get<any>(
-      'SELECT * FROM workspaces WHERE path = ?',
-      [workspacePath]
-    );
+    let workspace = await this.globalDb.getWorkspaceByPath(workspacePath);
 
     if (!workspace) {
       // Create new workspace
       const workspaceId = uuidv4();
       const workspaceName = workspacePath.split('/').pop() || 'Unknown Project';
       
-      await this.db.run(
-        `INSERT INTO workspaces (id, path, name, created_at, updated_at, is_active)
-         VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)`,
-        [workspaceId, workspacePath, workspaceName]
-      );
+      const newWorkspace: NewWorkspace = {
+        id: workspaceId,
+        path: workspacePath,
+        name: workspaceName,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
 
-      workspace = await this.db.get<any>(
-        'SELECT * FROM workspaces WHERE id = ?',
-        [workspaceId]
-      );
+      workspace = await this.globalDb.createWorkspace(newWorkspace);
     } else {
       // Activate existing workspace
-      await this.db.run(
-        'UPDATE workspaces SET is_active = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-        [workspace.id]
-      );
+      workspace = await this.globalDb.updateWorkspace(workspace.id, {
+        status: 'active',
+        updatedAt: new Date().toISOString()
+      });
     }
 
     return workspace;
@@ -115,24 +116,23 @@ export class StartTool {
    * Create new session for the workspace
    */
   private async createSession(workspaceId: string): Promise<any> {
-    // Deactivate any existing active sessions for this workspace
-    await this.db.run(
-      'UPDATE sessions SET is_active = 0 WHERE workspace_id = ? AND is_active = 1',
-      [workspaceId]
-    );
+    // Close any existing active sessions for this workspace
+    const activeSessions = await this.globalDb.getWorkspaceSessions(workspaceId);
+    for (const session of activeSessions.filter(s => s.isActive)) {
+      await this.globalDb.closeSession(session.id);
+    }
 
     // Create new session
     const sessionId = uuidv4();
-    await this.db.run(
-      `INSERT INTO sessions (id, workspace_id, created_at, last_activity, is_active)
-       VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)`,
-      [sessionId, workspaceId]
-    );
+    const newSession: NewSession = {
+      id: sessionId,
+      workspaceId: workspaceId,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+      lastActivity: new Date().toISOString()
+    };
 
-    return await this.db.get<any>(
-      'SELECT * FROM sessions WHERE id = ?',
-      [sessionId]
-    );
+    return await this.globalDb.createSession(newSession);
   }
 
   /**
@@ -140,26 +140,12 @@ export class StartTool {
    */
   private async getWorkspaceRules(workspaceId: string): Promise<string | null> {
     try {
-      const workspaceRulesStep = await this.db.get<any>(
-        'SELECT instructions FROM feedback_steps WHERE name = ? AND workspace_id = ?',
-        ['workspace_rules', workspaceId]
-      );
-      
-      return workspaceRulesStep?.instructions || null;
+      const workspaceRulesStep = await this.globalDb.getFeedbackStepByName('workspace_rules', workspaceId);
+      return workspaceRulesStep?.templateContent || null;
     } catch (error) {
       console.error('Error fetching workspace rules:', error);
       return null;
     }
-  }
-
-  /**
-   * Update workspace last activity timestamp
-   */
-  private async updateWorkspaceActivity(workspaceId: string): Promise<void> {
-    await this.db.run(
-      'UPDATE workspaces SET last_activity = CURRENT_TIMESTAMP WHERE id = ?',
-      [workspaceId]
-    );
   }
 
   /**

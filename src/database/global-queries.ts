@@ -32,6 +32,13 @@ export class GlobalDatabaseService {
     await this.db.initialize();
   }
 
+  /**
+   * Get the underlying DrizzleDatabaseManager instance
+   */
+  getDrizzleManager(): DrizzleDatabaseManager {
+    return this.db;
+  }
+
   // ========================================
   // WORKSPACE OPERATIONS
   // ========================================

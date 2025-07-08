@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import type { DatabaseManager } from '../database/connection.js';
+import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
 import type { TaskPilotToolResult } from '../types/index.js';
 import { PromptOrchestrator } from '../services/prompt-orchestrator.js';
+import { GlobalDatabaseService } from '../database/global-queries.js';
 
 // Input schema for taskpilot_status tool
 export const statusToolSchema = z.object({
@@ -12,7 +13,7 @@ export const statusToolSchema = z.object({
 export type StatusToolInput = z.infer<typeof statusToolSchema>;
 
 /**
- * TaskPilot Status Tool - Project Status Reporting
+ * TaskPilot Status Tool - Project Status Reporting (Pure TypeScript/Drizzle)
  * 
  * Orchestration tool for project status analysis (aka //status) that 
  * provides comprehensive reporting on task progress, rule violations,
@@ -20,9 +21,11 @@ export type StatusToolInput = z.infer<typeof statusToolSchema>;
  */
 export class StatusTool {
   private orchestrator: PromptOrchestrator;
+  private globalDb: GlobalDatabaseService;
 
-  constructor(private db: DatabaseManager) {
-    this.orchestrator = new PromptOrchestrator(db);
+  constructor(private drizzleDb: DrizzleDatabaseManager) {
+    this.orchestrator = new PromptOrchestrator(drizzleDb);
+    this.globalDb = new GlobalDatabaseService(drizzleDb);
   }
 
   /**
@@ -33,7 +36,7 @@ export class StatusTool {
       const { workspace_path, detailed = false } = input;
 
       // Ensure workspace exists
-      const workspace = await this.getWorkspace(workspace_path);
+      const workspace = await this.globalDb.getWorkspaceByPath(workspace_path);
       if (!workspace) {
         return {
           content: [{
@@ -44,35 +47,26 @@ export class StatusTool {
         };
       }
 
-      // Get all tasks for analysis
-      const tasks = await this.getTasks(workspace.id);
-      
-        // Generate status summary data for context
-      const statusSummary = this.generateStatusSummary(tasks);
-      
       // Generate orchestrated prompt using the flow system
+      // Note: Task analysis would require workspace-specific database
       const orchestrationResult = await this.orchestrator.orchestratePrompt(
         'taskpilot_status',
         workspace.id,
         {
           workspace_path,
           workspace_name: workspace.name,
-          task_count: tasks.length,
-            total_progress: statusSummary.totalProgress,
-            avg_progress: (statusSummary.totalProgress / Math.max(tasks.length, 1)).toFixed(1),
-            status_breakdown: JSON.stringify(statusSummary.byStatus),
-            priority_breakdown: JSON.stringify(statusSummary.byPriority),
-            blocked_count: statusSummary.byStatus.Blocked || 0,
-            high_priority_count: statusSummary.byPriority.High || 0,
-            detailed,
-            timestamp: new Date().toISOString()
+          detailed,
+          timestamp: new Date().toISOString(),
+          // Include instructions for file-based status analysis
+          task_file_path: `${workspace_path}/.task/todo/current.md`,
+          status_analysis_instructions: 'Analyze .task/todo/current.md file for task status summary and recommendations'
         }
       );
 
       return {
         content: [{
           type: 'text',
-            text: orchestrationResult.prompt_text
+          text: orchestrationResult.prompt_text
         }]
       };
     } catch (error) {
@@ -85,70 +79,6 @@ export class StatusTool {
         isError: true
       };
     }
-  }
-
-  /**
-   * Generate status summary from tasks
-   */
-  private generateStatusSummary(tasks: any[]) {
-    const summary = {
-      byStatus: {} as Record<string, number>,
-      byPriority: {} as Record<string, number>,
-      totalProgress: 0
-    };
-
-    // Initialize status counts
-    const statuses = ['Backlog', 'In-Progress', 'Blocked', 'Review', 'Done', 'Dropped'];
-    statuses.forEach(status => summary.byStatus[status] = 0);
-
-    // Initialize priority counts
-    const priorities = ['High', 'Medium', 'Low'];
-    priorities.forEach(priority => summary.byPriority[priority] = 0);
-
-    // Count tasks and calculate totals
-    tasks.forEach(task => {
-      summary.byStatus[task.status] = (summary.byStatus[task.status] || 0) + 1;
-      summary.byPriority[task.priority] = (summary.byPriority[task.priority] || 0) + 1;
-      summary.totalProgress += task.progress || 0;
-    });
-
-    return summary;
-  }
-
-  /**
-   * Get workspace by path
-   */
-  private async getWorkspace(workspacePath: string): Promise<any> {
-    return await this.db.get<any>(
-      'SELECT * FROM workspaces WHERE path = ?',
-      [workspacePath]
-    );
-  }
-
-  /**
-   * Get all tasks for workspace
-   */
-  private async getTasks(workspaceId: string): Promise<any[]> {
-    return await this.db.all<any[]>(
-      `SELECT * FROM tasks 
-       WHERE workspace_id = ? 
-       ORDER BY 
-         CASE priority 
-           WHEN 'High' THEN 1 
-           WHEN 'Medium' THEN 2 
-           WHEN 'Low' THEN 3 
-         END,
-         CASE status
-           WHEN 'In-Progress' THEN 1
-           WHEN 'Review' THEN 2
-           WHEN 'Blocked' THEN 3
-           WHEN 'Backlog' THEN 4
-           WHEN 'Done' THEN 5
-           WHEN 'Dropped' THEN 6
-         END,
-         created_at DESC`,
-      [workspaceId]
-    );
   }
 
   /**

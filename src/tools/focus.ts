@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import type { DatabaseManager } from '../database/connection.js';
+import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
 import type { TaskPilotToolResult } from '../types/index.js';
 import { PromptOrchestrator } from '../services/prompt-orchestrator.js';
+import { GlobalDatabaseService } from '../database/global-queries.js';
 
 // Input schema for taskpilot_focus tool
 export const focusToolSchema = z.object({
@@ -12,7 +13,7 @@ export const focusToolSchema = z.object({
 export type FocusToolInput = z.infer<typeof focusToolSchema>;
 
 /**
- * TaskPilot Focus Tool - Task Focusing
+ * TaskPilot Focus Tool - Task Focusing (Pure TypeScript/Drizzle)
  * 
  * MCP tool for setting active task context and providing implementation guidance.
  * Provides comprehensive context about the focused task including dependencies,
@@ -20,9 +21,11 @@ export type FocusToolInput = z.infer<typeof focusToolSchema>;
  */
 export class FocusTool {
   private orchestrator: PromptOrchestrator;
+  private globalDb: GlobalDatabaseService;
 
-  constructor(private db: DatabaseManager) {
-    this.orchestrator = new PromptOrchestrator(db);
+  constructor(private drizzleDb: DrizzleDatabaseManager) {
+    this.orchestrator = new PromptOrchestrator(drizzleDb);
+    this.globalDb = new GlobalDatabaseService(drizzleDb);
   }
 
   /**
@@ -33,7 +36,7 @@ export class FocusTool {
       const { task_id, workspace_path } = input;
 
       // Get workspace
-      const workspace = await this.getWorkspace(workspace_path);
+      const workspace = await this.globalDb.getWorkspaceByPath(workspace_path);
       if (!workspace) {
         return {
           content: [{
@@ -44,54 +47,26 @@ export class FocusTool {
         };
       }
 
-      // Get the task to focus on
-      const task = await this.getTask(task_id, workspace.id);
-      if (!task) {
-        return {
-          content: [{
-            type: 'text',
-            text: `Error: Task '${task_id}' not found in workspace.`
-          }],
-          isError: true
-        };
-      }
+      // Update workspace active task
+      await this.globalDb.updateWorkspace(workspace.id, {
+        activeTask: task_id,
+        updatedAt: new Date().toISOString()
+      });
 
-      // Get related tasks and dependencies
-      const dependencies = await this.getTaskDependencies(task_id, workspace.id);
-      const subtasks = await this.getSubtasks(task_id, workspace.id);
-      const blockedBy = await this.getBlockedByTask(task.blocked_by_task_id, workspace.id);
-
-      // Update task status to In-Progress if it's currently Backlog
-      if (task.status === 'Backlog') {
-        await this.updateTaskStatus(task_id, workspace.id, 'In-Progress');
-        task.status = 'In-Progress';
-      }
-
-      // Update session with active task
-      await this.updateActiveTask(workspace.id, task_id);
-
-      // Generate orchestrated prompt with comprehensive task context
+      // Generate orchestrated prompt for task focus
       const orchestrationResult = await this.orchestrator.orchestratePrompt(
         'taskpilot_focus',
         workspace.id,
         {
-          task_id: task.id,
-          task_title: task.title,
-          task_description: task.description,
-          task_priority: task.priority,
-          task_status: task.status,
-          task_progress: task.progress,
-          parent_task_id: task.parent_task_id,
-          connected_files: JSON.parse(task.connected_files || '[]'),
-          notes: task.notes || '',
-          dependencies_count: dependencies.length,
-          subtasks_count: subtasks.length,
-          blocked_by_task: blockedBy ? `${blockedBy.id}: ${blockedBy.title}` : null,
-          workspace_name: workspace.name,
+          task_id,
           workspace_path,
-          created_at: task.created_at,
-          updated_at: task.updated_at,
-          timestamp: new Date().toISOString()
+          workspace_name: workspace.name,
+          timestamp: new Date().toISOString(),
+          // Include instructions for file-based task analysis
+          task_file_path: `${workspace_path}/.task/todo/current.md`,
+          project_file_path: `${workspace_path}/.task/project.md`,
+          rules_file_path: `${workspace_path}/.task/rules/workspace_rules.md`,
+          focus_instructions: `Set focus on task ${task_id} and provide comprehensive context from .task folder files`
         }
       );
 
@@ -114,88 +89,12 @@ export class FocusTool {
   }
 
   /**
-   * Get workspace by path
-   */
-  private async getWorkspace(workspacePath: string): Promise<any> {
-    return await this.db.get<any>(
-      'SELECT * FROM workspaces WHERE path = ?',
-      [workspacePath]
-    );
-  }
-
-  /**
-   * Get task by ID within workspace
-   */
-  private async getTask(taskId: string, workspaceId: string): Promise<any> {
-    return await this.db.get<any>(
-      'SELECT * FROM tasks WHERE id = ? AND workspace_id = ?',
-      [taskId, workspaceId]
-    );
-  }
-
-  /**
-   * Get tasks that depend on this task (children)
-   */
-  private async getTaskDependencies(taskId: string, workspaceId: string): Promise<any[]> {
-    return await this.db.all<any[]>(
-      'SELECT * FROM tasks WHERE parent_task_id = ? AND workspace_id = ?',
-      [taskId, workspaceId]
-    );
-  }
-
-  /**
-   * Get subtasks of this task
-   */
-  private async getSubtasks(taskId: string, workspaceId: string): Promise<any[]> {
-    return await this.db.all<any[]>(
-      'SELECT * FROM tasks WHERE parent_task_id = ? AND workspace_id = ?',
-      [taskId, workspaceId]
-    );
-  }
-
-  /**
-   * Get task that blocks this task
-   */
-  private async getBlockedByTask(blockedByTaskId: string | null, workspaceId: string): Promise<any> {
-    if (!blockedByTaskId) return null;
-    return await this.db.get<any>(
-      'SELECT * FROM tasks WHERE id = ? AND workspace_id = ?',
-      [blockedByTaskId, workspaceId]
-    );
-  }
-
-  /**
-   * Update task status
-   */
-  private async updateTaskStatus(taskId: string, workspaceId: string, newStatus: string): Promise<void> {
-    await this.db.run(
-      'UPDATE tasks SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND workspace_id = ?',
-      [newStatus, taskId, workspaceId]
-    );
-  }
-
-  /**
-   * Update session with active task
-   */
-  private async updateActiveTask(workspaceId: string, taskId: string): Promise<void> {
-    // Update the most recent active session for this workspace
-    await this.db.run(
-      `UPDATE sessions 
-       SET last_activity = CURRENT_TIMESTAMP 
-       WHERE workspace_id = ? AND is_active = 1
-       ORDER BY started_at DESC
-       LIMIT 1`,
-      [workspaceId]
-    );
-  }
-
-  /**
    * Get tool definition for MCP server
    */
   static getToolDefinition() {
     return {
       name: 'taskpilot_focus',
-      description: 'Focus on a specific task and provide implementation context',
+      description: 'Focus on a specific task and provide comprehensive implementation context',
       inputSchema: {
         type: 'object',
         properties: {

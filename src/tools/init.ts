@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import type { DatabaseManager } from '../database/connection.js';
+import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
 import type { TaskPilotToolResult } from '../types/index.js';
 import { PromptOrchestrator } from '../services/prompt-orchestrator.js';
 import { ProjectInitializer } from '../services/project-initializer.js';
+import { workspaceFeedbackSteps } from '../database/schema/workspace-schema.js';
+import { eq } from 'drizzle-orm';
 
 // Input schema for taskpilot_init tool
 export const initToolSchema = z.object({
@@ -26,9 +28,10 @@ export class InitTool {
   private orchestrator: PromptOrchestrator;
   private projectInitializer: ProjectInitializer;
 
-  constructor(private db: DatabaseManager) {
-    this.orchestrator = new PromptOrchestrator(db);
-    this.projectInitializer = new ProjectInitializer(db);
+  constructor(private drizzleDb: DrizzleDatabaseManager) {
+    // For now, pass the drizzleDb as any to maintain backward compatibility during migration
+    this.orchestrator = new PromptOrchestrator(drizzleDb as any);
+    this.projectInitializer = new ProjectInitializer(drizzleDb);
   }
 
   /**
@@ -89,12 +92,12 @@ export class InitTool {
    */
   private async getWorkspaceRules(workspaceId: string): Promise<string | null> {
     try {
-      const workspaceRulesStep = await this.db.get<any>(
-        'SELECT instructions FROM feedback_steps WHERE name = ? AND workspace_id = ?',
-        ['workspace_rules', workspaceId]
-      );
+      const workspaceRulesStep = await this.drizzleDb.getDb().select()
+        .from(workspaceFeedbackSteps)
+        .where(eq(workspaceFeedbackSteps.name, 'workspace_rules'))
+        .get();
       
-      return workspaceRulesStep?.instructions || null;
+      return workspaceRulesStep?.templateContent || null;
     } catch (error) {
       console.error('Error fetching workspace rules:', error);
       return null;
