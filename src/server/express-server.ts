@@ -1,7 +1,7 @@
 /**
  * Express Server Integration
  * 
- * Unified server that combines MCP server + UI + REST API
+ * Backend server that provides MCP + REST API with CORS support for separate UI
  */
 
 import express, { Request, Response, NextFunction } from 'express';
@@ -46,19 +46,36 @@ export class ExpressServer {
     // Parse JSON bodies
     this.app.use(express.json());
     
-    // Enable CORS for development
-    if (this.options.dev) {
-      this.app.use((req, res, next) => {
+    // Enable CORS for development and localhost access
+    this.app.use((req, res, next) => {
+      // Allow localhost origins for development
+      const allowedOrigins = [
+        'http://localhost:3000',
+        'http://localhost:5173', // Default Vite/Rsbuild port
+        'http://localhost:8080',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:8080'
+      ];
+
+      const origin = req.headers.origin;
+      if (this.options.dev && origin && allowedOrigins.includes(origin)) {
+        res.header('Access-Control-Allow-Origin', origin);
+      } else if (this.options.dev) {
+      // For development, allow any localhost
         res.header('Access-Control-Allow-Origin', '*');
-        res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-        res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-        if (req.method === 'OPTIONS') {
-          res.sendStatus(200);
-        } else {
-          next();
-        }
-      });
-    }
+      }
+
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+      res.header('Access-Control-Allow-Credentials', 'true');
+
+      if (req.method === 'OPTIONS') {
+        res.sendStatus(200);
+      } else {
+        next();
+      }
+    });
 
     // Request logging in dev mode
     if (this.options.dev) {
@@ -128,55 +145,7 @@ export class ExpressServer {
   }
 
   /**
-   * Setup static UI serving
-   */
-  setupStaticUI(): void {
-    const uiDistPath = path.resolve(__dirname, '../../ui/dist');
-    
-    try {
-      // Serve static files from UI dist
-      this.app.use(express.static(uiDistPath));
-
-      // SPA fallback - serve index.html for any non-API routes
-      this.app.get('*', (req, res, next) => {
-        // Skip API routes
-        if (req.path.startsWith('/api') || req.path.startsWith('/sse')) {
-          return next();
-        }
-        
-        const indexPath = path.join(uiDistPath, 'index.html');
-        res.sendFile(indexPath, (err) => {
-          if (err) {
-            console.error('Error serving UI:', err);
-            res.status(404).json({ 
-              error: 'UI not found', 
-              message: 'Run "npm run build" to build the UI first' 
-            });
-          }
-        });
-      });
-
-      console.log(`Static UI configured to serve from ${uiDistPath}`);
-    } catch (error) {
-      console.warn('Static UI setup failed:', error);
-      
-      // Fallback for missing UI
-      this.app.get('/', (req, res) => {
-        res.json({
-          message: 'TaskPilot Server Running',
-          endpoints: {
-            api: '/api',
-            mcp_sse: '/sse',
-            health: '/health'
-          },
-          note: 'UI not available - run "npm run build" to build the UI'
-        });
-      });
-    }
-  }
-
-  /**
-   * Setup health check endpoint
+   * Setup health check and root endpoints
    */
   setupHealthCheck(): void {
     this.app.get('/health', (req, res) => {
@@ -184,10 +153,36 @@ export class ExpressServer {
         status: 'healthy',
         timestamp: new Date().toISOString(),
         version: '0.1.0',
-        mode: 'http',
-        port: this.options.port
+        mode: this.options.dev ? 'development' : 'production',
+        port: this.options.port,
+        endpoints: {
+          api: '/api',
+          mcp_sse: '/sse',
+          health: '/health'
+        }
       });
     });
+
+    // Root endpoint for API discovery
+    this.app.get('/', (req, res) => {
+      res.json({
+        message: 'TaskPilot Backend API',
+        version: '0.1.0',
+        mode: this.options.dev ? 'development' : 'production',
+        endpoints: {
+          api: '/api',
+          mcp_sse: '/sse',
+          health: '/health'
+        },
+        cors: this.options.dev ? 'enabled for localhost development' : 'disabled',
+        note: this.options.dev ? 'UI should be running separately on http://localhost:5173' : 'Backend API only'
+      });
+    });
+
+    // In production, also try to serve static UI files if they exist
+    if (!this.options.dev) {
+      this.setupProductionStaticUI();
+    }
   }
 
   /**
@@ -196,11 +191,14 @@ export class ExpressServer {
   async start(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.httpServer = this.app.listen(this.options.port, () => {
-        console.log(`TaskPilot integrated server running on http://localhost:${this.options.port}`);
-        console.log(`  UI: http://localhost:${this.options.port}/`);
+        console.log(`TaskPilot backend server running on http://localhost:${this.options.port}`);
         console.log(`  API: http://localhost:${this.options.port}/api`);
         console.log(`  MCP SSE: http://localhost:${this.options.port}/sse`);
         console.log(`  Health: http://localhost:${this.options.port}/health`);
+        if (this.options.dev) {
+          console.log(`  CORS: Enabled for localhost development`);
+          console.log(`  Note: UI should run separately on http://localhost:5173`);
+        }
         resolve();
       });
 
@@ -221,7 +219,7 @@ export class ExpressServer {
     return new Promise((resolve) => {
       if (this.httpServer) {
         this.httpServer.close(() => {
-          console.log('TaskPilot server stopped');
+          console.log('TaskPilot backend server stopped');
           resolve();
         });
       } else {
@@ -235,5 +233,41 @@ export class ExpressServer {
    */
   getApp(): express.Application {
     return this.app;
+  }
+
+  /**
+   * Setup production static UI serving (optional)
+   */
+  private setupProductionStaticUI(): void {
+    try {
+      const uiDistPath = path.resolve(__dirname, '../../ui/dist');
+
+      // Serve static files from UI dist directory
+      this.app.use(express.static(uiDistPath));
+
+      // SPA fallback - serve index.html for non-API routes
+      this.app.use((req, res, next) => {
+        // Skip if this is an API route, SSE, health check, or static file
+        if (req.path.startsWith('/api') ||
+          req.path.startsWith('/sse') ||
+          req.path.startsWith('/health') ||
+          req.path.includes('.') || // Skip requests for files with extensions
+          req.method !== 'GET') {   // Only handle GET requests
+          return next();
+        }
+
+        const indexPath = path.join(uiDistPath, 'index.html');
+        res.sendFile(indexPath, (err) => {
+          if (err) {
+            // Silently fail - API info already served by root endpoint
+            next();
+          }
+        });
+      });
+
+      console.log(`Production static UI configured to serve from ${uiDistPath}`);
+    } catch (error) {
+      console.warn('Production static UI setup failed, API-only mode:', error);
+    }
   }
 }

@@ -107,10 +107,22 @@ export class TaskPilotApiClient {
   private sseEventHandlers: Map<string, Set<SSEEventHandler>> = new Map()
 
   constructor(config: ApiClientConfig = {}) {
-    this.baseUrl = config.baseUrl || 'http://localhost:3001'
+    // Use environment variable or fallback to config or default
+    // Handle case where import.meta.env might be undefined
+    const envApiUrl = typeof import.meta !== 'undefined' &&
+      import.meta.env &&
+      import.meta.env.VITE_API_BASE_URL
+      ? import.meta.env.VITE_API_BASE_URL
+      : null;
+
+    this.baseUrl = config.baseUrl ||
+      envApiUrl ||
+      'http://localhost:8989'
     this.timeout = config.timeout || 10000
     this.retryAttempts = config.retryAttempts || 3
     this.retryDelay = config.retryDelay || 1000
+
+    console.log(`TaskPilot API Client initialized with base URL: ${this.baseUrl}`)
   }
 
   // ========================================
@@ -234,7 +246,17 @@ export class TaskPilotApiClient {
       this.disconnectSSE()
     }
 
-    const url = `${this.baseUrl}/api/events${clientId ? `?clientId=${clientId}` : ''}`
+    // Use environment variable for SSE URL or construct from base URL
+    const envSseUrl = typeof import.meta !== 'undefined' &&
+      import.meta.env &&
+      import.meta.env.VITE_MCP_SSE_URL
+      ? import.meta.env.VITE_MCP_SSE_URL
+      : null;
+
+    const sseUrl = envSseUrl || `${this.baseUrl}/sse`
+    const url = `${sseUrl}${clientId ? `?clientId=${clientId}` : ''}`
+
+    console.log(`Connecting to SSE: ${url}`)
     this.sseConnection = new EventSource(url)
 
     this.sseConnection.onopen = () => {

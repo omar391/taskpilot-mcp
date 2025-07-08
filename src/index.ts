@@ -19,8 +19,7 @@ import { PromptOrchestrator } from './services/prompt-orchestrator.js';
 
 // Utils
 import { parseCliArgs, displayHelp } from './utils/cli-parser.js';
-import { ensurePortAvailable } from './utils/port-manager.js';
-import { killExistingTaskPilotProcesses, registerSignalHandlers } from './utils/process-manager.js';
+import { ensurePortFree } from './utils/process-manager.js';
 
 // Express server
 import { ExpressServer, MCPToolHandlers } from './server/express-server.js';
@@ -307,11 +306,11 @@ async function startStdioMode() {
 async function startHttpMode(port: number) {
   console.log(`Starting TaskPilot integrated server on port ${port}`);
   
-  // Kill any existing TaskPilot processes
-  await killExistingTaskPilotProcesses();
-  
-  // Ensure port is available
-  await ensurePortAvailable(port);
+  // Ensure port is free (killing any processes using it)
+  const portFree = await ensurePortFree(port);
+  if (!portFree) {
+    throw new Error(`Unable to free port ${port} for TaskPilot server`);
+  }
   
   // Create Express server
   expressServer = new ExpressServer({ port, dev: process.env.NODE_ENV !== 'production' });
@@ -322,18 +321,50 @@ async function startHttpMode(port: number) {
   
   // Setup REST API endpoints
   expressServer.setupAPIEndpoints(globalDbService);
-  
-  // Setup static UI serving
-  expressServer.setupStaticUI();
-  
+
   // Setup health check
   expressServer.setupHealthCheck();
   
-  // Setup graceful shutdown handling
-  registerSignalHandlers('TaskPilot Integrated Server');
+  // Setup graceful shutdown handling with Express server cleanup
+  setupGracefulShutdown();
   
   // Start the server
   await expressServer.start();
+}
+
+function setupGracefulShutdown(): void {
+  const shutdownHandler = async (signal: string) => {
+    console.log(`\n${signal} received. Shutting down TaskPilot Integrated Server gracefully...`);
+
+    try {
+      if (expressServer) {
+        await expressServer.stop();
+      }
+    } catch (error) {
+      console.error('Error during shutdown:', error);
+    }
+
+    console.log('TaskPilot Integrated Server shutdown complete.');
+    process.exit(0);
+  };
+
+  process.on('SIGINT', () => shutdownHandler('SIGINT'));
+  process.on('SIGTERM', () => shutdownHandler('SIGTERM'));
+  process.on('SIGUSR1', () => shutdownHandler('SIGUSR1'));
+  process.on('SIGUSR2', () => shutdownHandler('SIGUSR2'));
+
+  // Handle uncaught exceptions gracefully
+  process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    console.log('Shutting down due to uncaught exception...');
+    process.exit(1);
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    console.log('Shutting down due to unhandled rejection...');
+    process.exit(1);
+  });
 }
 
 async function main() {
@@ -361,23 +392,6 @@ async function main() {
     process.exit(1);
   }
 }
-
-// Handle shutdown gracefully
-process.on('SIGINT', async () => {
-  console.log('\nShutting down TaskPilot server...');
-  if (expressServer) {
-    await expressServer.stop();
-  }
-  process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-  console.log('\nShutting down TaskPilot server...');
-  if (expressServer) {
-    await expressServer.stop();
-  }
-  process.exit(0);
-});
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(console.error);

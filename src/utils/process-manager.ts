@@ -10,81 +10,73 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 /**
- * Find TaskPilot processes by name or command pattern
+ * Ensure the target port is free for TaskPilot server
+ * Kills any processes using the port, regardless of what they are
  */
-export async function findTaskPilotProcesses(): Promise<Array<{pid: string, command: string}>> {
+export async function ensurePortFree(port: number): Promise<boolean> {
   try {
-    // Look for node processes running TaskPilot
-    const { stdout } = await execAsync('ps aux | grep -E "(taskpilot|build/index\\.js)" | grep -v grep');
-    const lines = stdout.trim().split('\n').filter(line => line.trim());
-    
-    const processes: Array<{pid: string, command: string}> = [];
-    
-    for (const line of lines) {
-      const parts = line.trim().split(/\s+/);
-      if (parts.length >= 11) {
-        const pid = parts[1];
-        const command = parts.slice(10).join(' ');
-        processes.push({ pid, command });
-      }
+    // Check if port is in use
+    const { stdout } = await execAsync(`lsof -i :${port}`);
+    if (!stdout.trim()) {
+      return true; // Port is free
     }
-    
-    return processes;
-  } catch (error) {
-    return [];
-  }
-}
 
-/**
- * Kill all TaskPilot processes except the current one
- */
-export async function killExistingTaskPilotProcesses(): Promise<number> {
-  try {
-    const currentPid = process.pid.toString();
-    const processes = await findTaskPilotProcesses();
+    console.log(`Port ${port} is in use. Freeing it for TaskPilot server...`);
     
+    // Get PIDs of processes using the port
+    const { stdout: pidOutput } = await execAsync(`lsof -ti :${port}`);
+    const pids = pidOutput.trim().split('\n').filter(pid => pid);
+    
+    if (pids.length === 0) {
+      return true; // No processes found
+    }
+
+    // Kill processes using the port
     let killedCount = 0;
-    
-    for (const proc of processes) {
-      if (proc.pid !== currentPid) {
+    for (const pid of pids) {
+      try {
+    // Try graceful termination first
+        await execAsync(`kill ${pid}`);
+        console.log(`Gracefully terminated process ${pid} on port ${port}`);
+        killedCount++;
+      } catch (error) {
         try {
-          // Try graceful termination first
-          await execAsync(`kill ${proc.pid}`);
-          console.log(`Terminated existing TaskPilot process ${proc.pid}: ${proc.command.substring(0, 60)}...`);
+      // Force kill if graceful fails
+          await execAsync(`kill -9 ${pid}`);
+          console.log(`Force killed process ${pid} on port ${port}`);
           killedCount++;
-        } catch (error) {
-          try {
-            // Force kill if graceful fails
-            await execAsync(`kill -9 ${proc.pid}`);
-            console.log(`Force killed TaskPilot process ${proc.pid}`);
-            killedCount++;
-          } catch (forceError) {
-            console.warn(`Failed to kill TaskPilot process ${proc.pid}:`, forceError);
-          }
+        } catch (forceError) {
+          console.warn(`Failed to kill process ${pid}:`, forceError);
         }
       }
     }
-    
-    if (killedCount > 0) {
-      // Wait for processes to clean up
-      await new Promise(resolve => setTimeout(resolve, 1500));
-    }
-    
-    return killedCount;
-  } catch (error) {
-    console.warn('Error killing existing TaskPilot processes:', error);
-    return 0;
-  }
-}
 
-/**
- * Check if there are other TaskPilot instances running
- */
-export async function hasOtherTaskPilotInstances(): Promise<boolean> {
-  const processes = await findTaskPilotProcesses();
-  const currentPid = process.pid.toString();
-  
-  return processes.some(proc => proc.pid !== currentPid);
+    if (killedCount > 0) {
+      // Wait for processes to terminate
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Verify port is now free
+      try {
+        const { stdout: checkOutput } = await execAsync(`lsof -i :${port}`);
+        if (checkOutput.trim()) {
+          console.warn(`Port ${port} still in use after cleanup`);
+          return false;
+        }
+      } catch (error) {
+        // lsof returns non-zero when no processes found, which is what we want
+      }
+    }
+
+    console.log(`Port ${port} is now free`);
+    return true;
+  } catch (error) {
+    // lsof returns non-zero exit code when no processes found
+    if (error instanceof Error && error.message?.includes('lsof')) {
+      return true; // Port is free
+    }
+    console.warn(`Error checking port ${port}:`, error);
+    return false;
+  }
 }
 
 /**
