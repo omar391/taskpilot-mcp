@@ -12,8 +12,7 @@
   ],
   "scripts": {
     "build": "tsc && cd ui && bun run build && node -e \"require('fs').chmodSync('../build/index.js', '755')\"",
-    "dev": "tsc --watch",
-    "start": "node build/index.js",
+    "dev": "npx tsx --watch src/index.ts",
     "serve": "node build/index.js --port=8989"
   },
   "dependencies": {
@@ -32,6 +31,7 @@
     "@types/node": "^20.19.4",
     "concurrently": "^9.2.0",
     "drizzle-kit": "^0.31.4",
+    "tsx": "^4.20.3",
     "typescript": "^5.3.3"
   }
 }

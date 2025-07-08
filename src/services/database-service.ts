@@ -1,4 +1,6 @@
-import { DatabaseManager, getGlobalDatabase, getWorkspaceDatabase, initializeWorkspaceDatabase } from '../database/connection.js';
+import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
+import { GlobalDatabaseService } from '../database/global-queries.js';
+import { WorkspaceDatabaseService } from '../database/workspace-queries.js';
 
 /**
  * Database Service
@@ -8,123 +10,69 @@ import { DatabaseManager, getGlobalDatabase, getWorkspaceDatabase, initializeWor
  * a clean interface for tools to access the appropriate database.
  */
 export class DatabaseService {
-  private globalDb: DatabaseManager;
-  private workspaceDb: DatabaseManager | null = null;
-  private currentWorkspacePath: string | null = null;
+  private globalDb: GlobalDatabaseService;
+  private workspaceDbCache = new Map<string, WorkspaceDatabaseService>();
 
-  constructor(globalDb: DatabaseManager) {
-    this.globalDb = globalDb;
+  constructor(globalDrizzleDb: DrizzleDatabaseManager) {
+    this.globalDb = new GlobalDatabaseService(globalDrizzleDb);
   }
 
   /**
-   * Get global database instance
+   * Get global database service
    */
-  getGlobal(): DatabaseManager {
+  getGlobal(): GlobalDatabaseService {
     return this.globalDb;
   }
 
   /**
-   * Get workspace database instance
-   * Initializes workspace database if not already initialized for this workspace
+   * Get workspace database service
+   * Caches workspace database instances for efficiency
    */
-  async getWorkspace(workspacePath: string): Promise<DatabaseManager> {
-    // If we already have a workspace DB for this path, return it
-    if (this.workspaceDb && this.currentWorkspacePath === workspacePath) {
-      return this.workspaceDb;
+  async getWorkspace(workspacePath: string): Promise<WorkspaceDatabaseService> {
+    // Check cache first
+    if (this.workspaceDbCache.has(workspacePath)) {
+      return this.workspaceDbCache.get(workspacePath)!;
     }
 
-    // Initialize new workspace database
-    this.workspaceDb = await initializeWorkspaceDatabase(workspacePath);
-    this.currentWorkspacePath = workspacePath;
+    // Create new workspace database service
+    const workspaceDb = new WorkspaceDatabaseService(workspacePath);
+    await workspaceDb.initialize();
     
-    return this.workspaceDb;
+    // Cache it
+    this.workspaceDbCache.set(workspacePath, workspaceDb);
+    
+    return workspaceDb;
   }
 
   /**
-   * Execute query on global database
+   * Clear workspace database cache
    */
-  async globalAll<T = any>(sql: string, params: any[] = []): Promise<T[]> {
-    return this.globalDb.all<T>(sql, params);
+  clearWorkspaceCache(): void {
+    this.workspaceDbCache.clear();
   }
 
   /**
-   * Execute query on global database (single result)
+   * Check if global database is ready
    */
-  async globalGet<T = any>(sql: string, params: any[] = []): Promise<T | undefined> {
-    return this.globalDb.get<T>(sql, params);
-  }
-
-  /**
-   * Execute query on global database (run)
-   */
-  async globalRun(sql: string, params: any[] = []): Promise<any> {
-    return this.globalDb.run(sql, params);
-  }
-
-  /**
-   * Execute query on workspace database
-   */
-  async workspaceAll<T = any>(workspacePath: string, sql: string, params: any[] = []): Promise<T[]> {
-    const db = await this.getWorkspace(workspacePath);
-    return db.all<T>(sql, params);
-  }
-
-  /**
-   * Execute query on workspace database (single result)
-   */
-  async workspaceGet<T = any>(workspacePath: string, sql: string, params: any[] = []): Promise<T | undefined> {
-    const db = await this.getWorkspace(workspacePath);
-    return db.get<T>(sql, params);
-  }
-
-  /**
-   * Execute query on workspace database (run)
-   */
-  async workspaceRun(workspacePath: string, sql: string, params: any[] = []): Promise<any> {
-    const db = await this.getWorkspace(workspacePath);
-    return db.run(sql, params);
-  }
-
-  /**
-   * Execute transaction on global database
-   */
-  async globalTransaction(statements: Array<{ sql: string; params?: any[] }>): Promise<void> {
-    return this.globalDb.transaction(statements);
-  }
-
-  /**
-   * Execute transaction on workspace database
-   */
-  async workspaceTransaction(workspacePath: string, statements: Array<{ sql: string; params?: any[] }>): Promise<void> {
-    const db = await this.getWorkspace(workspacePath);
-    return db.transaction(statements);
-  }
-
-  /**
-   * Close all database connections
-   */
-  async close(): Promise<void> {
-    if (this.globalDb) {
-      await this.globalDb.close();
-    }
-    if (this.workspaceDb) {
-      await this.workspaceDb.close();
-      this.workspaceDb = null;
-      this.currentWorkspacePath = null;
+  async isGlobalReady(): Promise<boolean> {
+    try {
+      await this.globalDb.getAllWorkspaces();
+      return true;
+    } catch {
+      return false;
     }
   }
 
   /**
    * Check if workspace database is ready
    */
-  isWorkspaceReady(workspacePath: string): boolean {
-    return this.workspaceDb !== null && this.currentWorkspacePath === workspacePath;
-  }
-
-  /**
-   * Check if global database is ready
-   */
-  isGlobalReady(): boolean {
-    return this.globalDb.isReady();
+  async isWorkspaceReady(workspacePath: string): Promise<boolean> {
+    try {
+      const workspaceDb = await this.getWorkspace(workspacePath);
+      await workspaceDb.getAllTasks();
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

@@ -6,10 +6,12 @@
  * in the global database for UI discovery.
  */
 
-import { DatabaseManager } from '../database/connection.js';
+import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
+import { GlobalDatabaseService } from '../database/global-queries.js';
 import { existsSync, readdirSync, statSync } from 'fs';
 import { join, resolve } from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import type { Workspace } from '../database/schema/global-schema.js';
 
 export interface WorkspaceMetadata {
   id: string;
@@ -30,13 +32,13 @@ export interface WorkspaceRegistryOptions {
 }
 
 export class WorkspaceRegistry {
-  private globalDb: DatabaseManager;
+  private globalDb: GlobalDatabaseService;
   private options: Required<WorkspaceRegistryOptions>;
   private activityTimers = new Map<string, NodeJS.Timeout>();
   private scanInterval?: NodeJS.Timeout;
 
-  constructor(globalDb: DatabaseManager, options: WorkspaceRegistryOptions = {}) {
-    this.globalDb = globalDb;
+  constructor(drizzleDb: DrizzleDatabaseManager, options: WorkspaceRegistryOptions = {}) {
+    this.globalDb = new GlobalDatabaseService(drizzleDb);
     this.options = {
       scanPaths: options.scanPaths || [],
       autoRegister: options.autoRegister || false,
@@ -89,10 +91,7 @@ export class WorkspaceRegistry {
     const resolvedPath = resolve(workspacePath);
     
     // Check if workspace already exists
-    const existing = await this.globalDb.get<{ id: string }>(
-      'SELECT id FROM workspaces WHERE path = ?',
-      [resolvedPath]
-    );
+    const existing = await this.globalDb.getWorkspaceByPath(resolvedPath);
 
     if (existing) {
       console.log(`Workspace already registered: ${resolvedPath}`);
@@ -107,32 +106,32 @@ export class WorkspaceRegistry {
     // Determine initial status
     const status = this.checkWorkspaceHealth(resolvedPath);
 
-    // Insert workspace into global database
-    await this.globalDb.run(`
-      INSERT INTO workspaces (
-        id, path, name, status, created_at, updated_at, last_activity, is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [workspaceId, resolvedPath, workspaceName, status, now, now, now, 1]);
+    // Create workspace using Drizzle ORM
+    const workspace = await this.globalDb.createWorkspace({
+      id: workspaceId,
+      path: resolvedPath,
+      name: workspaceName,
+      status,
+      createdAt: now,
+      updatedAt: now,
+      lastActivity: now,
+      taskCount: 0,
+      activeTask: null
+    });
 
     console.log(`Registered workspace: ${workspaceName} at ${resolvedPath}`);
     
     // Start activity monitoring
     this.startActivityMonitoring(workspaceId);
 
-    return workspaceId;
+    return workspace.id;
   }
 
   /**
    * Update workspace activity (called when workspace is accessed)
    */
   async updateWorkspaceActivity(workspaceId: string): Promise<void> {
-    const now = new Date().toISOString();
-    
-    await this.globalDb.run(`
-      UPDATE workspaces 
-      SET last_activity = ?, updated_at = ?, is_active = 1, status = 'connected'
-      WHERE id = ?
-    `, [now, now, workspaceId]);
+    await this.globalDb.updateWorkspaceActivity(workspaceId);
 
     // Reset activity timer
     this.startActivityMonitoring(workspaceId);
@@ -143,10 +142,7 @@ export class WorkspaceRegistry {
    */
   async updateWorkspaceActivityByPath(workspacePath: string): Promise<void> {
     const resolvedPath = resolve(workspacePath);
-    const workspace = await this.globalDb.get<{ id: string }>(
-      'SELECT id FROM workspaces WHERE path = ?',
-      [resolvedPath]
-    );
+    const workspace = await this.globalDb.getWorkspaceByPath(resolvedPath);
 
     if (workspace) {
       await this.updateWorkspaceActivity(workspace.id);
@@ -157,19 +153,17 @@ export class WorkspaceRegistry {
    * Get all registered workspaces
    */
   async getAllWorkspaces(): Promise<WorkspaceMetadata[]> {
-    const workspaces = await this.globalDb.all<any>(`
-      SELECT id, path, name, status, last_activity, is_active, created_at, updated_at
-      FROM workspaces
-      ORDER BY last_activity DESC
-    `);
+    const workspaces = await this.globalDb.getAllWorkspaces();
 
-    return workspaces.map(ws => ({
+    return workspaces.map((ws: Workspace) => ({
       id: ws.id,
       path: ws.path,
       name: ws.name,
-      status: ws.status,
-      lastActivity: new Date(ws.last_activity),
-      isActive: Boolean(ws.is_active)
+      status: ws.status as 'connected' | 'disconnected' | 'error',
+      lastActivity: new Date(ws.lastActivity || ws.createdAt || new Date().toISOString()),
+      isActive: ws.status === 'active',
+      taskCount: ws.taskCount || 0,
+      activeTask: ws.activeTask
     }));
   }
 
@@ -178,10 +172,7 @@ export class WorkspaceRegistry {
    */
   async getWorkspaceByPath(workspacePath: string): Promise<WorkspaceMetadata | null> {
     const resolvedPath = resolve(workspacePath);
-    const workspace = await this.globalDb.get<any>(
-      'SELECT * FROM workspaces WHERE path = ?',
-      [resolvedPath]
-    );
+    const workspace = await this.globalDb.getWorkspaceByPath(resolvedPath);
 
     if (!workspace) {
       return null;
@@ -191,9 +182,11 @@ export class WorkspaceRegistry {
       id: workspace.id,
       path: workspace.path,
       name: workspace.name,
-      status: workspace.status,
-      lastActivity: new Date(workspace.last_activity),
-      isActive: Boolean(workspace.is_active)
+      status: workspace.status as 'connected' | 'disconnected' | 'error',
+      lastActivity: new Date(workspace.lastActivity || workspace.createdAt || new Date().toISOString()),
+      isActive: workspace.status === 'active',
+      taskCount: workspace.taskCount || 0,
+      activeTask: workspace.activeTask
     };
   }
 
@@ -296,7 +289,7 @@ export class WorkspaceRegistry {
   /**
    * Check workspace health status
    */
-  private checkWorkspaceHealth(workspacePath: string): 'connected' | 'disconnected' | 'error' {
+  private checkWorkspaceHealth(workspacePath: string): 'active' | 'idle' | 'inactive' | 'disconnected' | 'error' {
     try {
       if (!existsSync(workspacePath)) {
         return 'error';
@@ -325,11 +318,10 @@ export class WorkspaceRegistry {
     // Set new timer
     const timer = setTimeout(async () => {
       try {
-        await this.globalDb.run(`
-          UPDATE workspaces 
-          SET is_active = 0, status = 'disconnected', updated_at = ?
-          WHERE id = ?
-        `, [new Date().toISOString(), workspaceId]);
+        await this.globalDb.updateWorkspace(workspaceId, {
+          status: 'inactive',
+          updatedAt: new Date().toISOString()
+        });
         
         this.activityTimers.delete(workspaceId);
         console.log(`Workspace ${workspaceId} marked as inactive due to timeout`);
@@ -352,11 +344,10 @@ export class WorkspaceRegistry {
         const status = this.checkWorkspaceHealth(workspace.path);
         
         if (workspace.status !== status) {
-          await this.globalDb.run(`
-            UPDATE workspaces 
-            SET status = ?, updated_at = ?
-            WHERE id = ?
-          `, [status, new Date().toISOString(), workspace.id]);
+          await this.globalDb.updateWorkspace(workspace.id, {
+            status,
+            updatedAt: new Date().toISOString()
+          });
         }
       }
     } catch (error) {
@@ -376,7 +367,7 @@ export class WorkspaceRegistry {
     }
 
     // Remove from database
-    await this.globalDb.run('DELETE FROM workspaces WHERE id = ?', [workspaceId]);
+    await this.globalDb.deleteWorkspace(workspaceId);
     
     console.log(`Unregistered workspace: ${workspaceId}`);
   }
@@ -391,22 +382,14 @@ export class WorkspaceRegistry {
     disconnected: number;
     error: number;
   }> {
-    const stats = await this.globalDb.get<any>(`
-      SELECT 
-        COUNT(*) as total,
-        SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active,
-        SUM(CASE WHEN status = 'connected' THEN 1 ELSE 0 END) as connected,
-        SUM(CASE WHEN status = 'disconnected' THEN 1 ELSE 0 END) as disconnected,
-        SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END) as error
-      FROM workspaces
-    `);
+    const allWorkspaces = await this.globalDb.getAllWorkspaces();
 
     return {
-      total: stats?.total || 0,
-      active: stats?.active || 0,
-      connected: stats?.connected || 0,
-      disconnected: stats?.disconnected || 0,
-      error: stats?.error || 0
+      total: allWorkspaces.length,
+      active: allWorkspaces.filter(ws => ws.status === 'active').length,
+      connected: allWorkspaces.filter(ws => ws.status === 'active' || ws.status === 'idle').length,
+      disconnected: allWorkspaces.filter(ws => ws.status === 'disconnected' || ws.status === 'inactive').length,
+      error: allWorkspaces.filter(ws => ws.status === 'error').length
     };
   }
 }
