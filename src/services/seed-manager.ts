@@ -11,12 +11,12 @@ import {
   type NewFeedbackStep,
   type NewMcpServerMapping
 } from '../database/schema/global-schema.js';
-import { 
-  GLOBAL_TOOL_FLOWS_SEED, 
-  GLOBAL_FEEDBACK_STEPS_SEED, 
-  MCP_SERVER_MAPPINGS_SEED 
+import {
+  GLOBAL_TOOL_FLOWS_SEED,
+  GLOBAL_FEEDBACK_STEPS_SEED,
+  MCP_SERVER_MAPPINGS_SEED
 } from '../data/embedded-seed-data.js';
-
+import { isStdioMode } from '../utils/cli-parser.js';
 /**
  * Pure TypeScript/Drizzle ORM seed manager
  * Eliminates custom SQL and JSON, uses type-safe Drizzle operations
@@ -43,7 +43,9 @@ export class SeedManager {
       await this.drizzleDb.insert(toolFlows).values(GLOBAL_TOOL_FLOWS_SEED);
       await this.drizzleDb.insert(mcpServerMappings).values(MCP_SERVER_MAPPINGS_SEED);
 
-      console.log('Global seed data initialized successfully');
+      if (!isStdioMode()) {
+        console.log('Global seed data initialized successfully');
+      }
     } catch (error) {
       console.error('Error initializing global seed data:', error);
       throw error;

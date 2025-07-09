@@ -20,7 +20,8 @@
     "serve": "npm run build && node build/index.js --port=8989",
     "lint": "npm run lint:server && npm run lint:ui",
     "lint:server": "tsc --noEmit",
-    "lint:ui": "cd ui && tsc --noEmit"
+    "lint:ui": "cd ui && tsc --noEmit",
+    "inspector": "npx @modelcontextprotocol/inspector build/index.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "0.6.0",

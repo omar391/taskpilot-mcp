@@ -57,13 +57,11 @@ let globalDbService: any;
 let databaseService: DatabaseService;
 let expressServer: ExpressServer | null = null;
 
-async function initializeServer() {
+async function initializeServer(cliMode?: string) {
   try {
     // DIAGNOSTIC: Check if we're in stdio mode to avoid stdout pollution
     const cliOptions = parseCliArgs();
     const isStdioMode = cliOptions.mode === 'stdio';
-
-    console.debug(`[DEBUG] initializeServer called, stdio mode: ${isStdioMode}`);
 
     // Initialize global database using pure Drizzle system
     globalDbService = await initializeGlobalDatabaseService();
@@ -283,9 +281,12 @@ function createMCPToolHandlers(): MCPToolHandlers {
   };
 }
 
-async function startStdioMode() {
+async function startStdioMode(cliOptions: any) {
   // POTENTIAL ISSUE: This console.log goes to stdout, violating MCP protocol
-  console.error('[DEBUG] Starting TaskPilot MCP server in STDIO mode (logging to stderr)');
+  if (cliOptions.mode !== 'stdio') {
+    // Allow error logs only in test for debugging
+    console.error('[DEBUG] Starting TaskPilot MCP server in STDIO mode (logging to stderr)');
+  }
 
   const server = new Server(
     {
@@ -306,18 +307,25 @@ async function startStdioMode() {
 
   // Handle tool calls
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    console.debug(`[DEBUG] MCP tool call received: ${request.params.name}`);
+    // Avoid debug logs in stdio mode
+    if (cliOptions.mode !== 'stdio') {
+      console.debug(`[DEBUG] MCP tool call received: ${request.params.name}`);
+    }
     const { name, arguments: args } = request.params;
     return await toolHandlers.handleToolCall(name, args);
   });
 
   // Start the server
   const transport = new StdioServerTransport();
-  console.error('[DEBUG] Connecting to STDIO transport...');
+  if (cliOptions.mode !== 'stdio') {
+    console.error('[DEBUG] Connecting to STDIO transport...');
+  }
   await server.connect(transport);
 
   // POTENTIAL ISSUE: This console.log goes to stdout, violating MCP protocol
-  console.error('[DEBUG] TaskPilot MCP server running on stdio (logging to stderr)');
+  if (cliOptions.mode !== 'stdio') {
+    console.error('[DEBUG] TaskPilot MCP server running on stdio (logging to stderr)');
+  }
 }
 
 async function startHttpMode(port: number) {
@@ -385,13 +393,16 @@ function setupGracefulShutdown(): void {
 }
 
 async function main() {
+  let cliOptions: any;
   try {
     // Parse CLI arguments
-    const cliOptions = parseCliArgs();
+    cliOptions = parseCliArgs();
 
     // DIAGNOSTIC: Log parsed CLI options to stderr (not stdout to avoid MCP protocol pollution)
-    console.error(`[DEBUG] Parsed CLI options:`, JSON.stringify(cliOptions, null, 2));
-    console.error(`[DEBUG] Process argv:`, process.argv);
+    if (cliOptions.mode !== 'stdio') {
+      console.error(`[DEBUG] Parsed CLI options:`, JSON.stringify(cliOptions, null, 2));
+      console.error(`[DEBUG] Process argv:`, process.argv);
+    }
 
     if (cliOptions.help) {
       displayHelp();
@@ -399,26 +410,42 @@ async function main() {
     }
 
     // DIAGNOSTIC: Log mode detection
-    console.error(`[DEBUG] Starting in mode: ${cliOptions.mode}`);
+    if (cliOptions.mode !== 'stdio') {
+      console.error(`[DEBUG] Starting in mode: ${cliOptions.mode}`);
+    }
 
     // Initialize server
-    await initializeServer();
+    await initializeServer(cliOptions.mode);
 
     // Start in appropriate mode
     if (cliOptions.mode === 'stdio') {
-      console.debug(`[DEBUG] Starting STDIO mode for MCP protocol`);
-      await startStdioMode();
+      // Avoid debug logs in stdio mode
+      await startStdioMode(cliOptions);
     } else {
       console.debug(`[DEBUG] Starting HTTP mode on port ${cliOptions.port}`);
       await startHttpMode(cliOptions.port);
     }
 
   } catch (error) {
-    console.error('Error starting server:', error);
+    // Only log error if cliOptions is defined and not stdio mode
+    if (cliOptions && cliOptions.mode !== 'stdio') {
+      console.error('Error starting server:', error);
+    }
     process.exit(1);
   }
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch(console.error);
+  main().catch((err) => {
+    // Only log error if not in stdio mode
+    let cliOptions: any;
+    try {
+      cliOptions = parseCliArgs();
+    } catch {
+      cliOptions = {};
+    }
+    if (!cliOptions.mode || cliOptions.mode !== 'stdio') {
+      console.error(err);
+    }
+  });
 }

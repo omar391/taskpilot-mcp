@@ -46,27 +46,32 @@ export class DrizzleDatabaseManager {
 
       // Create SQLite connection
       this.sqlite = new Database(this.dbPath);
-      
+
       // Enable foreign keys
       this.sqlite.pragma('foreign_keys = ON');
 
       // Create Drizzle instance with appropriate schema
       if (this.dbType === DatabaseType.GLOBAL) {
-        this.db = drizzle(this.sqlite, { 
+        this.db = drizzle(this.sqlite, {
           schema: { ...globalSchema, ...relations }
         });
       } else {
-        this.db = drizzle(this.sqlite, { 
+        this.db = drizzle(this.sqlite, {
           schema: { ...workspaceSchema }
         });
       }
 
       // For pure TypeScript approach, use programmatic migrations instead of file-based migrations
-      console.log('Running programmatic database migrations...');
+      const { isStdioMode } = await import('../utils/cli-parser.js');
+      if (!isStdioMode()) {
+        console.log('Running programmatic database migrations...');
+      }
       await this.runProgrammaticMigrations();
 
       this.isInitialized = true;
-      console.log(`${this.dbType} database initialized successfully at ${this.dbPath}`);
+      if (!isStdioMode()) {
+        console.log(`${this.dbType} database initialized successfully at ${this.dbPath}`);
+      }
     } catch (error) {
       console.error('Error initializing database:', error);
       throw error;
@@ -344,13 +349,13 @@ export async function initializeBothDatabases(workspacePath: string): Promise<{
     initializeGlobalDatabase(),
     initializeWorkspaceDatabase(workspacePath)
   ]);
-  
+
   return { global, workspace };
 }
 
 // Export schema types for use in other files
-export type { 
-  Workspace, NewWorkspace, 
+export type {
+  Workspace, NewWorkspace,
   Session, NewSession,
   ToolFlow, NewToolFlow,
   FeedbackStep, NewFeedbackStep,
