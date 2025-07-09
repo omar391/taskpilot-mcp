@@ -3,6 +3,7 @@ import { HomePage } from './pages/home'
 import { TasksPage } from './pages/tasks'
 import { ToolFlowsPage } from './pages/tool-flows'
 import { FeedbackStepsPage } from './pages/feedback-steps'
+import { FloatingNav } from './components/floating-nav'
 
 // Root route
 const rootRoute = createRootRoute({
@@ -37,7 +38,14 @@ const indexRoute = createRoute({
 const workspaceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/workspace/$workspaceId',
-  component: () => <div>Workspace Layout</div>,
+  component: () => (
+    <div className="relative min-h-screen">
+      <div className="main-content">
+        <Outlet />
+      </div>
+      <FloatingNav />
+    </div>
+  ),
 })
 
 const tasksRoute = createRoute({

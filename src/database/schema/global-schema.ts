@@ -49,6 +49,20 @@ export const feedbackSteps = sqliteTable('feedback_steps', {
   updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`)
 });
 
+export const toolFlowSteps = sqliteTable('tool_flow_steps', {
+  id: text('id').primaryKey(),
+  toolFlowId: text('tool_flow_id')
+    .notNull()
+    .references(() => toolFlows.id, { onDelete: 'cascade' }),
+  stepOrder: integer('step_order').notNull(),
+  systemToolFn: text('system_tool_fn').notNull(),
+  feedbackStep: text('feedback_step'),
+  nextTool: text('next_tool'),
+  metadata: text('metadata', { mode: 'json' }).default({}),
+  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`)
+});
+
 export const mcpServerMappings = sqliteTable('mcp_server_mappings', {
   id: text('id').primaryKey(),
   interfaceType: text('interface_type', { 
@@ -68,6 +82,8 @@ export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
 export type ToolFlow = typeof toolFlows.$inferSelect;
 export type NewToolFlow = typeof toolFlows.$inferInsert;
+export type ToolFlowStep = typeof toolFlowSteps.$inferSelect;
+export type NewToolFlowStep = typeof toolFlowSteps.$inferInsert;
 export type FeedbackStep = typeof feedbackSteps.$inferSelect;
 export type NewFeedbackStep = typeof feedbackSteps.$inferInsert;
 export type McpServerMapping = typeof mcpServerMappings.$inferSelect;

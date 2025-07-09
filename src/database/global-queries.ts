@@ -4,18 +4,23 @@ import {
   workspaces, 
   sessions, 
   toolFlows, 
+  toolFlowSteps,
   feedbackSteps, 
-  mcpServerMappings, 
-  type Workspace, 
-  type NewWorkspace,
-  type Session,
-  type NewSession,
-  type ToolFlow,
-  type NewToolFlow,
-  type FeedbackStep,
-  type NewFeedbackStep,
-  type McpServerMapping,
-  type NewMcpServerMapping
+  mcpServerMappings 
+} from './schema/global-schema.js';
+import type { 
+  Workspace, 
+  NewWorkspace, 
+  Session, 
+  NewSession, 
+  ToolFlow, 
+  NewToolFlow,
+  ToolFlowStep,
+  NewToolFlowStep, 
+  FeedbackStep, 
+  NewFeedbackStep, 
+  McpServerMapping, 
+  NewMcpServerMapping 
 } from './schema/global-schema.js';
 
 export class GlobalDatabaseService {
@@ -228,62 +233,113 @@ export class GlobalDatabaseService {
     } else {
       return db.select()
         .from(toolFlows)
-        .where(eq(toolFlows.isGlobal, true))
         .orderBy(asc(toolFlows.toolName));
     }
   }
 
   /**
-   * Get tool flow by tool name
+   * Get tool flow by ID
    */
-  async getToolFlowByName(toolName: string, workspaceId?: string): Promise<ToolFlow | null> {
+  async getToolFlowById(id: string): Promise<ToolFlow | null> {
     const db = this.db.getDb();
-    
-    if (workspaceId) {
-      // Check workspace-specific first, then global
-      const [workspaceResult] = await db.select()
-        .from(toolFlows)
-        .where(and(
-          eq(toolFlows.toolName, toolName),
-          eq(toolFlows.isGlobal, false),
-          eq(toolFlows.workspaceId, workspaceId)
-        ))
-        .limit(1);
-      
-      if (workspaceResult) {
-        return workspaceResult;
-      }
-    }
-    
-    // Fall back to global
-    const [globalResult] = await db.select()
+    const [flow] = await db.select()
       .from(toolFlows)
-      .where(and(eq(toolFlows.toolName, toolName), eq(toolFlows.isGlobal, true)))
+      .where(eq(toolFlows.id, id))
       .limit(1);
-    
-    return globalResult || null;
+    return flow || null;
   }
 
   /**
-   * Update tool flow
+   * Get tool flow by name
+   */
+  async getToolFlowByName(name: string, workspaceId?: string): Promise<ToolFlow | null> {
+    const db = this.db.getDb();
+    const whereClause = workspaceId 
+      ? and(eq(toolFlows.toolName, name), or(
+          eq(toolFlows.isGlobal, true),
+          and(eq(toolFlows.isGlobal, false), eq(toolFlows.workspaceId, workspaceId))
+        ))
+      : eq(toolFlows.toolName, name);
+    
+    const [flow] = await db.select()
+      .from(toolFlows)
+      .where(whereClause)
+      .limit(1);
+      
+    return flow || null;
+  }
+
+  /**
+   * Update a tool flow
    */
   async updateToolFlow(id: string, updates: Partial<Omit<ToolFlow, 'id' | 'createdAt'>>): Promise<ToolFlow | null> {
     const db = this.db.getDb();
-    const [result] = await db.update(toolFlows)
-      .set({ ...updates, updatedAt: new Date().toISOString() })
+    const [updatedFlow] = await db.update(toolFlows)
+      .set({
+        ...updates,
+        updatedAt: new Date().toISOString()
+      })
       .where(eq(toolFlows.id, id))
       .returning();
-    return result || null;
+    return updatedFlow || null;
   }
 
   /**
-   * Delete tool flow
+   * Delete a tool flow
    */
   async deleteToolFlow(id: string): Promise<boolean> {
     const db = this.db.getDb();
     const result = await db.delete(toolFlows).where(eq(toolFlows.id, id));
     return result.changes > 0;
   }
+
+  /**
+   * Get all steps for a specific tool flow
+   */
+  async getToolFlowSteps(toolFlowId: string): Promise<ToolFlowStep[]> {
+    const db = this.db.getDb();
+    return db.select()
+      .from(toolFlowSteps)
+      .where(eq(toolFlowSteps.toolFlowId, toolFlowId))
+      .orderBy(asc(toolFlowSteps.stepOrder));
+  }
+
+  /**
+   * Create a new tool flow step
+   */
+  async createToolFlowStep(step: NewToolFlowStep): Promise<ToolFlowStep> {
+    const db = this.db.getDb();
+    const [result] = await db.insert(toolFlowSteps).values(step).returning();
+    return result;
+  }
+
+  /**
+   * Update a tool flow step
+   */
+  async updateToolFlowStep(id: string, updates: Partial<Omit<ToolFlowStep, 'id' | 'createdAt'>>): Promise<ToolFlowStep | null> {
+    const db = this.db.getDb();
+    const [updatedStep] = await db.update(toolFlowSteps)
+      .set({
+        ...updates,
+        updatedAt: new Date().toISOString()
+      })
+      .where(eq(toolFlowSteps.id, id))
+      .returning();
+    return updatedStep || null;
+  }
+
+  /**
+   * Delete a tool flow step
+   */
+  async deleteToolFlowStep(id: string): Promise<boolean> {
+    const db = this.db.getDb();
+    const result = await db.delete(toolFlowSteps).where(eq(toolFlowSteps.id, id));
+    return result.changes > 0;
+  }
+
+
+
+
 
   // ========================================
   // FEEDBACK STEP OPERATIONS
@@ -401,6 +457,12 @@ export class GlobalDatabaseService {
     const result = await db.delete(feedbackSteps).where(eq(feedbackSteps.id, id));
     return result.changes > 0;
   }
+
+  // ========================================
+  // TOOL FLOW OPERATIONS
+  // ========================================
+
+
 
   // ========================================
   // MCP SERVER MAPPING OPERATIONS

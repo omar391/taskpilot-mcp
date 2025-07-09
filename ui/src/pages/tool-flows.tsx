@@ -1,10 +1,38 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToolFlowCard } from '@/components/tool-flow-card'
 import { Button } from '@/components/ui/button'
-import { Plus, Globe, Building, Settings } from 'lucide-react'
-import { apiClient, type ToolFlow, type FeedbackStep, type WorkspaceMetadata } from '@/lib/api-client'
+import { Plus, Globe, Building } from 'lucide-react'
+import { apiClient, type ToolFlow } from '@/lib/api-client'
+
+interface ErrorBoundaryProps {
+  children: React.ReactNode
+  fallback: React.ReactNode
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, { hasError: boolean }> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    console.error('Error in ErrorBoundary:', error)
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Error in ToolFlowsPage:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback
+    }
+    return this.props.children
+  }
+}
 
 export function ToolFlowsPage() {
   const params = useParams({ from: '/workspace/$workspaceId/tool-flows' })
@@ -12,290 +40,328 @@ export function ToolFlowsPage() {
   
   const [globalFlows, setGlobalFlows] = useState<ToolFlow[]>([])
   const [workspaceFlows, setWorkspaceFlows] = useState<ToolFlow[]>([])
-  const [feedbackSteps, setFeedbackSteps] = useState<FeedbackStep[]>([])
-  const [workspaces, setWorkspaces] = useState<WorkspaceMetadata[]>([])
-  const [selectedWorkspace, setSelectedWorkspace] = useState<string>(workspaceId)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [availableTools, setAvailableTools] = useState<string[]>([])
+  const [feedbackSteps, setFeedbackSteps] = useState<Record<string, any[]>>({})
+  const [isLoadingFeedback, setIsLoadingFeedback] = useState(false)
 
-  // Available MCP tools
-  const availableTools = [
-    'taskpilot_start',
-    'taskpilot_init', 
-    'taskpilot_add',
-    'taskpilot_create_task',
-    'taskpilot_status',
-    'taskpilot_update',
-    'taskpilot_focus',
-    'taskpilot_audit',
-    'taskpilot_github',
-    'taskpilot_rule_update',
-    'taskpilot_remote_interface'
-  ]
-
-  // Load data from API
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true)
-      setError(null)
+  // Handle clone flow
+  const handleCloneFlow = async (flow: ToolFlow) => {
+    try {
+      // TODO: Replace with actual API call when available
+      // const response = await apiClient.cloneToolFlow(workspaceId, flow.id)
+      // Add the cloned flow to the appropriate list
       
+      // For now, simulate API call with timeout
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Create a new flow with the same properties but new ID
+      const clonedFlow = {
+        ...flow,
+        id: `cloned_${Date.now()}`,
+        is_global: false, // Cloned flows should be workspace-specific
+        workspace_id: workspaceId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }
+      
+      // Add to workspace flows (since cloned flows are always workspace-specific)
+      setWorkspaceFlows(prev => [...prev, clonedFlow])
+      
+      // Show success message
+      // TODO: Replace with toast notification
+      console.log('Flow cloned successfully')
+    } catch (err) {
+      console.error('Failed to clone flow:', err)
+      setError('Failed to clone flow. Please try again.')
+    }
+  }
+  
+  // Available tools are now included in the tool flows response
+
+  // Fetch feedback steps for a flow
+  const fetchFeedbackSteps = async (flowId: string) => {
+    try {
+      setIsLoadingFeedback(true)
+      // TODO: Replace with actual API call when available
+      // const response = await apiClient.getFeedbackSteps(flowId)
+      await new Promise(resolve => setTimeout(resolve, 300)) // Simulate API delay
+      // Mock data - replace with actual API response
+      const mockSteps = [
+        { id: 'step1', name: 'Code Review', description: 'Review the generated code' },
+        { id: 'step2', name: 'Testing', description: 'Test the implementation' }
+      ]
+      setFeedbackSteps(prev => ({
+        ...prev,
+        [flowId]: mockSteps
+      }))
+      return mockSteps
+    } catch (err) {
+      console.error(`Failed to fetch feedback steps for flow ${flowId}:`, err)
+      return []
+    } finally {
+      setIsLoadingFeedback(false)
+    }
+  }
+
+  // Handle flow updates
+  const handleUpdateFlow = async (flowId: string, updates: Partial<ToolFlow>) => {
+    try {
+      setLoading(true)
+      // TODO: Replace with actual API call when available
+      // const response = await apiClient.updateToolFlow(workspaceId, flowId, updates)
+      await new Promise(resolve => setTimeout(resolve, 500)) // Simulate API delay
+      
+      // Update local state
+      setGlobalFlows(prev => 
+        prev.map(flow => 
+          flow.id === flowId ? { ...flow, ...updates } : flow
+        )
+      )
+      setWorkspaceFlows(prev => 
+        prev.map(flow => 
+          flow.id === flowId ? { ...flow, ...updates } : flow
+        )
+      )
+    } catch (err) {
+      console.error('Failed to update flow:', err)
+      setError('Failed to update tool flow. Please try again.')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Handle flow deletion
+  const handleDeleteFlow = async (flowId: string) => {
+    if (!confirm('Are you sure you want to delete this tool flow? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      setLoading(true)
+      // TODO: Replace with actual API call when available
+      // await apiClient.deleteToolFlow(workspaceId, flowId)
+      await new Promise(resolve => setTimeout(resolve, 300)) // Simulate API delay
+      
+      // Update local state
+      setGlobalFlows(prev => prev.filter(flow => flow.id !== flowId))
+      setWorkspaceFlows(prev => prev.filter(flow => flow.id !== flowId))
+    } catch (err) {
+      console.error('Failed to delete flow:', err)
+      setError('Failed to delete tool flow. Please try again.')
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const loadToolFlows = async () => {
       try {
-        // Load workspaces first
-        const workspacesResponse = await apiClient.getWorkspaces()
-        if (workspacesResponse.error) {
-          throw new Error(workspacesResponse.error)
-        }
-        setWorkspaces(workspacesResponse.data.workspaces)
-
-        // Load tool flows for current workspace
-        const toolFlowsResponse = await apiClient.getToolFlows(workspaceId)
-        if (toolFlowsResponse.error) {
-          throw new Error(toolFlowsResponse.error)
-        }
+        setLoading(true)
+        setError(null)
         
-        // Separate global and workspace-specific flows
-        const allFlows = toolFlowsResponse.data.toolFlows
-        setGlobalFlows(allFlows.filter(flow => flow.is_global))
-        setWorkspaceFlows(allFlows.filter(flow => !flow.is_global))
-
-        // Load feedback steps for current workspace
-        const feedbackResponse = await apiClient.getFeedbackSteps(workspaceId)
-        if (feedbackResponse.error) {
-          throw new Error(feedbackResponse.error)
+        console.log('Fetching tool flows for workspace:', workspaceId)
+        const response = await apiClient.getToolFlows(workspaceId)
+        console.log('API Response:', response)
+        
+        if (response.error) {
+          throw new Error(response.error)
         }
-        setFeedbackSteps(feedbackResponse.data.feedbackSteps)
 
+        // The API now returns separate arrays for global and workspace flows
+        const { global_flows = [], workspace_flows = [], available_tools = [] } = response.data || {};
+        
+        console.log('Global flows from API:', global_flows);
+        console.log('Workspace flows from API:', workspace_flows);
+        console.log('Available tools from API:', available_tools);
+        
+        // Update available tools from the API response
+        setAvailableTools(available_tools);
+        
+        // Set the flows directly from the API response
+        setGlobalFlows(global_flows);
+        setWorkspaceFlows(workspace_flows);
+        
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load data')
+        console.error('Error loading tool flows:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load tool flows')
       } finally {
         setLoading(false)
       }
     }
 
-    loadData()
+    loadToolFlows()
   }, [workspaceId])
 
-  const handleCloneFlow = (flow: ToolFlow) => {
-    // Directly clone to current workspace without dialog
-    const clonedFlow: ToolFlow = {
-      ...flow,
-      id: `wf_${Date.now()}`,
-      is_global: false,
-      workspace_id: workspaceId
-    }
-
-    setWorkspaceFlows(prev => [...prev, clonedFlow])
-  }
-
-  const handleUpdateWorkspaceFlow = (flowId: string, updates: Partial<ToolFlow>) => {
-    setWorkspaceFlows(prev => prev.map(flow => 
-      flow.id === flowId ? { ...flow, ...updates } : flow
-    ))
-  }
-
-  const handleDeleteWorkspaceFlow = (flowId: string) => {
-    setWorkspaceFlows(prev => prev.filter(flow => flow.id !== flowId))
-  }
-
-  const currentWorkspaceFlows = workspaceFlows.filter(
-    flow => flow.workspace_id === selectedWorkspace
-  )
-
-  const currentWorkspace = workspaces.find(w => w.id === selectedWorkspace)
-
-  return (
-    <div className="space-y-8">
-      {/* Loading State */}
-      {loading && (
-        <div className="text-center py-12">
-          <div className="h-12 w-12 mx-auto rounded-full border-4 border-gray-200 border-t-blue-500 animate-spin mb-4" />
-          <p className="text-gray-600">Loading tool flows...</p>
-        </div>
-      )}
-
-      {/* Error State */}
-      {error && (
-        <div className="text-center py-12">
-          <div className="h-12 w-12 mx-auto rounded-full bg-red-100 flex items-center justify-center mb-4">
-            <span className="text-2xl">⚠️</span>
-          </div>
-          <h3 className="text-lg font-semibold text-red-600 mb-3">Failed to Load Tool Flows</h3>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <Button onClick={() => window.location.reload()}>Retry</Button>
-        </div>
-      )}
-
-      {/* Content - only show when not loading and no error */}
-      {!loading && !error && (
-        <>
-          {/* Modern Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="h-16 w-16 rounded-3xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-xl">
-            <span className="text-3xl">⚡</span>
-          </div>
-          <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 bg-clip-text text-transparent">
-              Tool Flows
-            </h1>
-            <p className="text-muted-foreground text-lg">
-              Configure workflow sequences and automation rules
-            </p>
-          </div>
-        </div>
+  if (loading || isLoadingFeedback) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
+        <span className="ml-4 text-gray-600">Loading tool flows...</span>
       </div>
+    )
+  }
 
-      {/* Workspace Context */}
-      {currentWorkspace && (
-        <div className="modern-card">
-          <div className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Settings size={14} className="text-primary" />
+  if (error) {
+    return (
+      <div className="p-6 max-w-4xl mx-auto">
+        <div className="bg-red-50 border-l-4 border-red-400 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Error loading tool flows</h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>{error}</p>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-sm">{currentWorkspace.name}</p>
-                <p className="text-xs text-muted-foreground font-mono truncate">
-                  {currentWorkspace.path}
-                </p>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  className="rounded-md bg-red-50 px-2 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100"
+                  onClick={() => window.location.reload()}
+                >
+                  Reload page
+                </button>
               </div>
             </div>
           </div>
         </div>
-      )}
+      </div>
+    )
+  }
 
-      {/* Enhanced Tab Design with Improved Mobile Support */}
-      <Tabs defaultValue="global" className="w-full">
+  return (
+    <div className="space-y-6 pb-24">
+      <Tabs defaultValue="global" className="w-full space-y-6">
         <TabsList className="grid w-full grid-cols-2 rounded-2xl p-1 bg-muted/30 h-12">
           <TabsTrigger 
             value="global" 
             className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200 hover:bg-background/50 px-3 py-2 text-sm font-medium"
           >
-            <Globe size={16} className="flex-shrink-0" />
-            <span className="hidden sm:inline">Global</span>
-            <span className="sm:hidden">Global</span>
+            <Globe className="h-4 w-4" />
+            Global Flows
           </TabsTrigger>
           <TabsTrigger 
             value="workspace" 
             className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all duration-200 hover:bg-background/50 px-3 py-2 text-sm font-medium"
           >
-            <Building size={16} className="flex-shrink-0" />
-            <span className="hidden sm:inline">Workspace</span>
-            <span className="sm:hidden">Work</span>
+            <Building className="h-4 w-4" />
+            Workspace Flows
           </TabsTrigger>
         </TabsList>
 
-        {/* Global Tab */}
-        <TabsContent value="global" className="space-y-4 mt-6">
-          <div className="modern-card">
-            <div className="p-6 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                  <Globe size={20} className="text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg">Global Tool Flows</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Read-only configurations. Clone to customize for your workspace.
-                  </p>
-                </div>
+        <TabsContent value="global" className="mt-6">
+          <div className="space-y-4">
+            {globalFlows.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                No global tool flows found
               </div>
-              
-              <div className="space-y-3">
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {globalFlows.map((flow) => (
-                  <ToolFlowCard
+                  <ToolFlowCard 
                     key={flow.id}
                     flow={flow}
-                    feedbackSteps={feedbackSteps}
+                    feedbackSteps={feedbackSteps[flow.id] || []}
                     availableTools={availableTools}
-                    isEditable={false}
-                    onClone={handleCloneFlow}
+                    isEditable={!flow.is_global}
+                    onUpdate={handleUpdateFlow}
+                    onDelete={handleDeleteFlow}
+                    onClone={!flow.is_global ? undefined : handleCloneFlow}
+                    onEdit={() => {
+                      // Load feedback steps when editing
+                      if (!feedbackSteps[flow.id]) {
+                        fetchFeedbackSteps(flow.id)
+                      }
+                    }}
                   />
                 ))}
               </div>
-            </div>
+            )}
           </div>
         </TabsContent>
 
-        {/* Workspace Tab */}
-        <TabsContent value="workspace" className="space-y-4 mt-6">
-          <div className="modern-card">
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                    <Building size={20} className="text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-lg">Workspace Tool Flows</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Custom configurations for your specific workspace
-                    </p>
-                  </div>
-                </div>
-                <Button size="sm" className="rounded-xl shadow-sm">
-                  <Plus size={16} className="mr-2" />
-                  New Flow
-                </Button>
-              </div>
-              
-              {currentWorkspace && (
-                <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                      <Building size={14} className="text-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm">{currentWorkspace.name}</p>
-                      <p className="text-xs text-muted-foreground font-mono truncate">
-                        {currentWorkspace.path}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {currentWorkspaceFlows.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="h-16 w-16 mx-auto rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
-                    <Building size={24} className="text-muted-foreground" />
-                  </div>
-                  <h3 className="font-medium mb-2">No custom flows yet</h3>
-                  <p className="text-muted-foreground text-sm mb-4">
-                    Clone global flows to customize them for your specific needs.
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    className="rounded-xl"
-                    onClick={() => {
-                      const globalTab = document.querySelector('[value="global"]') as HTMLButtonElement
-                      globalTab?.click()
-                    }}
-                  >
-                    Browse Global Flows
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {currentWorkspaceFlows.map((flow) => (
-                    <ToolFlowCard
-                      key={flow.id}
-                      flow={flow}
-                      feedbackSteps={feedbackSteps}
-                      availableTools={availableTools}
-                      isEditable={true}
-                      onUpdate={handleUpdateWorkspaceFlow}
-                      onDelete={handleDeleteWorkspaceFlow}
-                    />
-                  ))}
-                </div>
-              )}
+        <TabsContent value="workspace" className="mt-6">
+          <div className="space-y-4">
+            <div className="flex justify-end">
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Workspace Flow
+              </Button>
             </div>
+            
+            {workspaceFlows.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                No workspace tool flows found
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {workspaceFlows.map((flow) => (
+                  <ToolFlowCard 
+                    key={flow.id}
+                    flow={flow}
+                    feedbackSteps={feedbackSteps[flow.id] || []}
+                    availableTools={availableTools}
+                    isEditable={!flow.is_global}
+                    onUpdate={handleUpdateFlow}
+                    onDelete={handleDeleteFlow}
+                    onClone={!flow.is_global ? undefined : handleCloneFlow}
+                    onEdit={() => {
+                      // Load feedback steps when editing
+                      if (!feedbackSteps[flow.id]) {
+                        fetchFeedbackSteps(flow.id)
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
-        </>
-      )}
     </div>
+  )
+}
+
+export default function ToolFlowsPageWithBoundary() {
+  return (
+    <ErrorBoundary
+      fallback={
+        <div className="p-6 max-w-4xl mx-auto">
+          <div className="bg-red-50 border-l-4 border-red-400 p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Something went wrong</h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>An unexpected error occurred. Please try again.</p>
+                </div>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    className="rounded-md bg-red-50 px-2 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100"
+                    onClick={() => window.location.reload()}
+                  >
+                    Reload page
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <ToolFlowsPage />
+    </ErrorBoundary>
   )
 }

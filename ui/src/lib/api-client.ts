@@ -92,6 +92,7 @@ export interface ApiClientConfig {
   timeout?: number
   retryAttempts?: number
   retryDelay?: number
+  autoConnectSSE?: boolean
 }
 
 // ========================================
@@ -217,8 +218,26 @@ export class TaskPilotApiClient {
   // Tool Flow API
   // ========================================
 
-  async getToolFlows(workspaceId: string): Promise<ApiResponse<{ toolFlows: ToolFlow[] }>> {
-    return this.makeRequest<{ toolFlows: ToolFlow[] }>(`/api/workspaces/${workspaceId}/tool-flows`)
+  async getToolFlows(workspaceId: string): Promise<ApiResponse<{ 
+    global_flows: ToolFlow[];
+    workspace_flows: ToolFlow[];
+    available_tools: string[];
+    workspace: {
+      id: string;
+      name: string;
+      path: string;
+    };
+  }>> {
+    return this.makeRequest<{
+      global_flows: ToolFlow[];
+      workspace_flows: ToolFlow[];
+      available_tools: string[];
+      workspace: {
+        id: string;
+        name: string;
+        path: string;
+      };
+    }>(`/api/workspaces/${workspaceId}/tool-flows`)
   }
 
   // ========================================
@@ -380,9 +399,8 @@ export function useApiClient(options: UseApiClientOptions = {}) {
 // Singleton API Client Instance
 // ========================================
 
-export const apiClient = new TaskPilotApiClient()
-
-// Connect to SSE by default in browser environment
-if (typeof window !== 'undefined') {
-  apiClient.connectSSE()
-}
+// Create API client without automatic SSE connection
+export const apiClient = new TaskPilotApiClient({
+  // Disable auto-connect by default
+  autoConnectSSE: false
+})

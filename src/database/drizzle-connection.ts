@@ -138,6 +138,18 @@ export class DrizzleDatabaseManager {
           updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
 
+        CREATE TABLE IF NOT EXISTS tool_flow_steps (
+          id TEXT PRIMARY KEY,
+          tool_flow_id TEXT NOT NULL,
+          step_order INTEGER NOT NULL,
+          system_tool_fn TEXT NOT NULL,
+          feedback_step TEXT,
+          next_tool TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (tool_flow_id) REFERENCES tool_flows(id) ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS feedback_steps (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,

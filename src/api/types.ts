@@ -79,12 +79,18 @@ export interface ToolFlowStep {
   system_tool_fn: string;
   feedback_step: string | null;
   next_tool: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ToolFlow {
   id: string;
   tool_name: string;
-  workspace_id?: string;
+  description?: string | null;
+  feedback_step_id?: string | null;
+  next_tool?: string | null;
+  is_global?: boolean | null;
+  workspace_id?: string | null;
   steps: ToolFlowStep[];
   created_at: string;
   updated_at: string;
@@ -178,6 +184,7 @@ export interface TasksQueryParams {
 
 export interface ToolFlowsQueryParams {
   type?: 'global' | 'workspace' | 'all';
+  include?: 'steps' | 'all' | 'none';
 }
 
 export interface FeedbackStepsQueryParams {
