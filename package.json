@@ -31,7 +31,8 @@
     "express": "^5.1.0",
     "sqlite3": "^5.1.7",
     "uuid": "^11.1.0",
-    "zod": "^3.25.74"
+    "zod": "^3.25.74",
+    "zod-to-json-schema": "^3.24.6"
   },
   "devDependencies": {
     "@rsbuild/core": "^1.4.5",

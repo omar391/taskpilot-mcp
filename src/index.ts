@@ -25,6 +25,7 @@ import { ensurePortFree } from './utils/process-manager.js';
 // Express server
 import { ExpressServer, MCPToolHandlers } from './server/express-server.js';
 
+import { zodToJsonSchema } from 'zod-to-json-schema';
 // Tools
 import { InitTool, initToolSchema } from './tools/init.js';
 import { StartTool, startToolSchema } from './tools/start.js';
@@ -109,57 +110,57 @@ function createMCPToolHandlers(): MCPToolHandlers {
           {
             name: "taskpilot_init",
             description: "Initialize a TaskPilot workspace with .task folder structure and configuration",
-            inputSchema: initToolSchema,
+            inputSchema: zodToJsonSchema(initToolSchema),
           },
           {
             name: "taskpilot_start",
             description: "Initialize TaskPilot session for a workspace and provide comprehensive project context",
-            inputSchema: startToolSchema,
+            inputSchema: zodToJsonSchema(startToolSchema),
           },
           {
             name: "taskpilot_add",
             description: "Orchestrate task creation workflow with analytical validation",
-            inputSchema: addToolSchema,
+            inputSchema: zodToJsonSchema(addToolSchema),
           },
           {
             name: "taskpilot_create_task",
             description: "Create a new task after validation passes",
-            inputSchema: createTaskToolSchema,
+            inputSchema: zodToJsonSchema(createTaskToolSchema),
           },
           {
             name: "taskpilot_status",
             description: "Generate comprehensive project status report with analysis and recommendations",
-            inputSchema: statusToolSchema,
+            inputSchema: zodToJsonSchema(statusToolSchema),
           },
           {
             name: "taskpilot_update",
             description: "Update task properties with audit trail and validation",
-            inputSchema: updateToolSchema,
+            inputSchema: zodToJsonSchema(updateToolSchema),
           },
           {
             name: "taskpilot_audit",
             description: "Perform comprehensive project audit with health checking and cleanup recommendations",
-            inputSchema: auditToolSchema,
+            inputSchema: zodToJsonSchema(auditToolSchema),
           },
           {
             name: "taskpilot_focus",
             description: "Focus on a specific task and provide comprehensive implementation context",
-            inputSchema: focusToolSchema,
+            inputSchema: zodToJsonSchema(focusToolSchema),
           },
           {
             name: "taskpilot_github",
             description: "Integrate with GitHub for issue creation, PR management, and task synchronization",
-            inputSchema: githubToolSchema,
+            inputSchema: zodToJsonSchema(githubToolSchema),
           },
           {
             name: "taskpilot_rule_update",
             description: "Manage workspace-specific rules and guidelines",
-            inputSchema: ruleUpdateToolSchema,
+            inputSchema: zodToJsonSchema(ruleUpdateToolSchema),
           },
           {
             name: "taskpilot_remote_interface",
             description: "Manage connections to external systems for task synchronization",
-            inputSchema: remoteInterfaceToolSchema,
+            inputSchema: zodToJsonSchema(remoteInterfaceToolSchema),
           },
         ],
       };
