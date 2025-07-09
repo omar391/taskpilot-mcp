@@ -1,4 +1,4 @@
-import { createRouter, createRoute, createRootRoute } from '@tanstack/react-router'
+import { createRouter, createRoute, createRootRoute, Outlet } from '@tanstack/react-router'
 import { HomePage } from './pages/home'
 import { TasksPage } from './pages/tasks'
 import { ToolFlowsPage } from './pages/tool-flows'
@@ -18,7 +18,7 @@ const rootRoute = createRootRoute({
           
           {/* Content */}
           <div id="router-outlet">
-            {/* This is where child routes will render */}
+            <Outlet />
           </div>
         </div>
       </div>

@@ -18,56 +18,45 @@ export class WorkspacesController {
   async getWorkspaces(req: Request, res: Response): Promise<void> {
     try {
       // Query workspaces from global database
-      const workspaces = await this.databaseService.globalAll(`
-        SELECT 
-          id,
-          name,
-          path,
-          status,
-          last_activity,
-          created_at,
-          updated_at
-        FROM workspaces 
-        ORDER BY last_activity DESC
-      `);
+      const globalDb = this.databaseService.getGlobal();
+      const workspaces = await globalDb.getAllWorkspaces();
 
       // For each workspace, get task counts and active task
       const enrichedWorkspaces: WorkspaceSummary[] = await Promise.all(
         workspaces.map(async (workspace: any) => {
           try {
-            // Get task count from workspace database
-            const taskCountResult = await this.databaseService.workspaceGet(
-              workspace.path,
-              'SELECT COUNT(*) as count FROM tasks WHERE status != "Done" AND status != "Dropped"'
+            // Get workspace database service
+            const workspaceDb = await this.databaseService.getWorkspace(workspace.path);
+            
+            // Get all tasks to calculate task count and find active task
+            const allTasks = await workspaceDb.getAllTasks();
+            const activeTasks = allTasks.filter(task => 
+              task.status !== 'done' && task.status !== 'dropped'
             );
-            const taskCount = taskCountResult?.count || 0;
+            const taskCount = activeTasks.length;
 
             // Get active task (highest priority in-progress task)
-            const activeTaskResult = await this.databaseService.workspaceGet(
-              workspace.path,
-              `SELECT title FROM tasks 
-               WHERE status = "In-Progress" 
-               ORDER BY 
-                 CASE priority 
-                   WHEN "High" THEN 1 
-                   WHEN "Medium" THEN 2 
-                   WHEN "Low" THEN 3 
-                 END,
-                 updated_at DESC 
-               LIMIT 1`
-            );
-            const activeTask = activeTaskResult?.title || null;
+            const inProgressTasks = allTasks.filter(task => task.status === 'in-progress');
+            const priorityOrder: Record<string, number> = { 'high': 1, 'medium': 2, 'low': 3 };
+            const activeTask = inProgressTasks
+              .sort((a, b) => {
+                const priorityDiff = (priorityOrder[a.priority || 'medium'] || 4) - (priorityOrder[b.priority || 'medium'] || 4);
+                if (priorityDiff !== 0) return priorityDiff;
+                const aTime = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+                const bTime = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+                return bTime - aTime;
+              })[0];
 
             return {
               id: workspace.id,
               name: workspace.name,
               path: workspace.path,
               status: workspace.status || 'disconnected',
-              last_activity: workspace.last_activity,
+              last_activity: workspace.lastActivity,
               task_count: taskCount,
-              active_task: activeTask,
-              created_at: workspace.created_at,
-              updated_at: workspace.updated_at
+              active_task: activeTask?.title || null,
+              created_at: workspace.createdAt,
+              updated_at: workspace.updatedAt
             };
           } catch (error) {
             // If workspace database is inaccessible, return basic info with error status
@@ -77,11 +66,11 @@ export class WorkspacesController {
               name: workspace.name,
               path: workspace.path,
               status: 'error' as const,
-              last_activity: workspace.last_activity,
+              last_activity: workspace.lastActivity,
               task_count: 0,
               active_task: null,
-              created_at: workspace.created_at,
-              updated_at: workspace.updated_at
+              created_at: workspace.createdAt,
+              updated_at: workspace.updatedAt,
             };
           }
         })
@@ -102,10 +91,8 @@ export class WorkspacesController {
    * Helper method to get workspace info by ID
    */
   async getWorkspaceById(workspaceId: string): Promise<any> {
-    const workspace = await this.databaseService.globalGet(
-      'SELECT * FROM workspaces WHERE id = ?',
-      [workspaceId]
-    );
+    const globalDb = this.databaseService.getGlobal();
+    const workspace = await globalDb.getWorkspace(workspaceId);
 
     if (!workspace) {
       throw new NotFoundError(`Workspace not found: ${workspaceId}`);

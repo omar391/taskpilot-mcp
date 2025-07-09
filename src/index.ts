@@ -14,6 +14,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { initializeGlobalDatabaseService } from './database/global-queries.js';
+import { DatabaseService } from './services/database-service.js';
 import { SeedManager } from './services/seed-manager.js';
 import { PromptOrchestrator } from './services/prompt-orchestrator.js';
 
@@ -53,6 +54,7 @@ let ruleUpdateTool: RuleUpdateTool;
 let remoteInterfaceTool: RemoteInterfaceTool;
 
 let globalDbService: any;
+let databaseService: DatabaseService;
 let expressServer: ExpressServer | null = null;
 
 async function initializeServer() {
@@ -60,6 +62,9 @@ async function initializeServer() {
     // Initialize global database using pure Drizzle system
     globalDbService = await initializeGlobalDatabaseService();
     const globalDrizzleManager = globalDbService.getDrizzleManager();
+    
+    // Create DatabaseService for API endpoints
+    databaseService = new DatabaseService(globalDrizzleManager);
     
     console.log('Pure TypeScript database system initialized successfully');
 
@@ -320,7 +325,7 @@ async function startHttpMode(port: number) {
   expressServer.setupMCPEndpoint(toolHandlers);
   
   // Setup REST API endpoints
-  expressServer.setupAPIEndpoints(globalDbService);
+  expressServer.setupAPIEndpoints(databaseService);
 
   // Setup health check
   expressServer.setupHealthCheck();

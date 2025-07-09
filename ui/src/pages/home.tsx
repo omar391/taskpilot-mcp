@@ -4,28 +4,35 @@ import { Link } from '@tanstack/react-router'
 import { Folder } from 'lucide-react'
 import { tailwindClasses, designSystem } from '@/lib/design-system'
 import { apiClient, type WorkspaceMetadata } from '@/lib/api-client'
+import { GettingStarted } from '@/components/getting-started'
+import { ConnectionStatus } from '@/components/connection-status'
 
 export function HomePage() {
   const [workspaces, setWorkspaces] = useState<WorkspaceMetadata[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'error' | 'connecting'>('connecting')
 
   // Load workspaces from API
   useEffect(() => {
     const loadWorkspaces = async () => {
       setLoading(true)
       setError(null)
+      setConnectionStatus('connecting')
       
       try {
         const response = await apiClient.getWorkspaces()
         
         if (response.error) {
           setError(response.error)
+          setConnectionStatus('error')
         } else {
           setWorkspaces(response.data.workspaces)
+          setConnectionStatus('connected')
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load workspaces')
+        setConnectionStatus('error')
       } finally {
         setLoading(false)
       }
@@ -60,6 +67,14 @@ export function HomePage() {
 
   return (
     <div className="space-y-8">
+      {/* Connection Status */}
+      <div className="flex justify-end">
+        <ConnectionStatus 
+          status={connectionStatus}
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border"
+        />
+      </div>
+
       {/* Loading State */}
       {loading && (
         <div className={`${tailwindClasses.card.base} ${tailwindClasses.card.hover}`}>
@@ -108,6 +123,9 @@ export function HomePage() {
       {/* Content - only show when not loading and no error */}
       {!loading && !error && (
         <>
+          {/* No Workspaces - Prominent Getting Started Hint */}
+          {workspaces.length === 0 && <GettingStarted />}
+
           {/* Show Active Workspaces first if any exist */}
       {activeWorkspaces.length > 0 && (
         <div className={`${tailwindClasses.card.base} ${tailwindClasses.card.hover}`}>
@@ -261,88 +279,37 @@ export function HomePage() {
         </div>
       )}
 
-      {/* Available Workspaces */}
-      <div className={`${tailwindClasses.card.base} ${tailwindClasses.card.hover}`}>
-        <div className="space-y-6">
-          <div className="flex items-center gap-4">
-            <div 
-              className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl flex items-center justify-center shadow-lg shrink-0"
-              style={{ 
-                background: `linear-gradient(135deg, ${designSystem.colors.neutral[500]}, ${designSystem.colors.neutral[600]})` 
-              }}
-            >
-              <span className="text-xl sm:text-2xl">💤</span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 
-                className={`${tailwindClasses.typography.title} text-xl sm:text-2xl`}
+      {/* Available Workspaces - only show if there are inactive workspaces */}
+      {inactiveWorkspaces.length > 0 && (
+        <div className={`${tailwindClasses.card.base} ${tailwindClasses.card.hover}`}>
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <div 
+                className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl flex items-center justify-center shadow-lg shrink-0"
                 style={{ 
-                  background: `linear-gradient(to right, ${designSystem.colors.neutral[500]}, ${designSystem.colors.neutral[600]})`,
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  fontWeight: '700'
+                  background: `linear-gradient(135deg, ${designSystem.colors.neutral[500]}, ${designSystem.colors.neutral[600]})` 
                 }}
               >
-                Available Workspaces
-              </h2>
-              <p className={`${tailwindClasses.typography.subtitle} text-sm sm:text-base`}>
-                {inactiveWorkspaces.length > 0 
-                  ? `${inactiveWorkspaces.length} workspace${inactiveWorkspaces.length !== 1 ? 's' : ''} ready to connect`
-                  : 'No workspaces detected'
-                }
-              </p>
-            </div>
-          </div>
-
-          {inactiveWorkspaces.length === 0 ? (
-            <div className="text-center py-12">
-              <div 
-                className="h-20 w-20 mx-auto rounded-3xl flex items-center justify-center mb-6"
-                style={{ backgroundColor: designSystem.colors.neutral[100] }}
-              >
-                <Folder size={32} style={{ color: designSystem.colors.neutral[400] }} />
+                <span className="text-xl sm:text-2xl">💤</span>
               </div>
-              <div>
-                <h3 
-                  className={`${tailwindClasses.typography.title} mb-3`}
-                  style={{ fontSize: '1.25rem' }}
+              <div className="min-w-0 flex-1">
+                <h2 
+                  className={`${tailwindClasses.typography.title} text-xl sm:text-2xl`}
+                  style={{ 
+                    background: `linear-gradient(to right, ${designSystem.colors.neutral[500]}, ${designSystem.colors.neutral[600]})`,
+                    WebkitBackgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    fontWeight: '700'
+                  }}
                 >
-                  No workspaces detected
-                </h3>
-                <p 
-                  className={`${tailwindClasses.typography.subtitle} mb-6 max-w-md mx-auto`}
-                >
-                  Start by running <code 
-                    className="px-2 py-1 rounded text-sm font-mono"
-                    style={{ backgroundColor: designSystem.colors.neutral[100] }}
-                  >taskpilot_start</code> from your LLM session to initialize a workspace.
+                  Available Workspaces
+                </h2>
+                <p className={`${tailwindClasses.typography.subtitle} text-sm sm:text-base`}>
+                  {inactiveWorkspaces.length} workspace{inactiveWorkspaces.length !== 1 ? 's' : ''} ready to connect
                 </p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button 
-                    variant="outline" 
-                    className="rounded-xl"
-                    style={{
-                      borderColor: designSystem.colors.neutral[300],
-                      color: designSystem.colors.neutral[700]
-                    }}
-                  >
-                    <span className="text-lg mr-2">📖</span>
-                    Learn More
-                  </Button>
-                  <Button 
-                    className="rounded-xl"
-                    style={{
-                      backgroundColor: designSystem.colors.accent.blue,
-                      color: 'white'
-                    }}
-                  >
-                    <span className="text-lg mr-2">🚀</span>
-                    Quick Start Guide
-                  </Button>
-                </div>
               </div>
             </div>
-          ) : (
+
             <div className="space-y-4">
               {inactiveWorkspaces.map((workspace) => (
                 <Link
@@ -425,9 +392,9 @@ export function HomePage() {
                 </Link>
               ))}
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
         </>
       )}
     </div>
