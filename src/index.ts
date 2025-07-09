@@ -38,6 +38,7 @@ import { FocusTool, focusToolSchema } from './tools/focus.js';
 import { GitHubTool, githubToolSchema } from './tools/github.js';
 import { RuleUpdateTool, ruleUpdateToolSchema } from './tools/rule-update.js';
 import { RemoteInterfaceTool, remoteInterfaceToolSchema } from './tools/remote-interface.js';
+import { InstanceManager } from './server/instance-manager.js';
 
 // Global variables
 let seedManager: SeedManager;
@@ -58,12 +59,8 @@ let globalDbService: any;
 let databaseService: DatabaseService;
 let expressServer: ExpressServer | null = null;
 
-async function initializeServer(cliMode?: string) {
+async function initializeServer() {
   try {
-    // DIAGNOSTIC: Check if we're in stdio mode to avoid stdout pollution
-    const cliOptions = parseCliArgs();
-    const isStdioMode = cliOptions.mode === 'stdio';
-
     // Initialize global database using pure Drizzle system
     globalDbService = await initializeGlobalDatabaseService();
     const globalDrizzleManager = globalDbService.getDrizzleManager();
@@ -92,10 +89,6 @@ async function initializeServer(cliMode?: string) {
     // Initialize global seed data using pure TypeScript approach
     await seedManager.initializeGlobalData();
 
-    if (!isStdioMode) {
-      console.log('Global seed data loaded successfully');
-      console.log('TaskPilot MCP server initialized successfully (Pure TypeScript/Drizzle ORM)');
-    }
   } catch (error) {
     console.error('Error initializing server:', error);
     throw error;
@@ -341,6 +334,16 @@ async function startHttpMode(port: number) {
   // Create Express server
   expressServer = new ExpressServer({ port, dev: process.env.NODE_ENV !== 'production' });
 
+  // Add /__version and /__shutdown endpoints for multi-instance/proxy logic
+  expressServer.registerCustomEndpoints((app) => {
+    app.get('/__version', (req, res) => {
+      res.json({ version: require('./server/instance-manager.js').InstanceManager.VERSION });
+    });
+    app.post('/__shutdown', (req, res) => {
+      res.status(200).json({ ok: true });
+      setTimeout(() => process.exit(0), 100);
+    });
+  });
   // Setup MCP endpoint with SSE
   const toolHandlers = createMCPToolHandlers();
   expressServer.setupMCPEndpoint(toolHandlers);
@@ -416,14 +419,57 @@ async function main() {
     }
 
     // Initialize server
-    await initializeServer(cliOptions.mode);
+    await initializeServer();
 
     // Start in appropriate mode
-    if (cliOptions.mode === 'stdio') {
-      // Avoid debug logs in stdio mode
-      await startStdioMode(cliOptions);
-    } else {
-      console.debug(`[DEBUG] Starting HTTP mode on port ${cliOptions.port}`);
+
+    // Multi-instance/proxy logic
+    const instanceManager = new InstanceManager();
+    let isMain = await instanceManager.tryBecomeMain();
+    if (!isMain) {
+      // Read lock and check PID liveness
+      const lock = await instanceManager.readLock();
+      if (!lock || !InstanceManager.isPidAlive(lock.pid)) {
+        // Stale lock, remove and try to become main again
+        await instanceManager.removeLock();
+        isMain = await instanceManager.tryBecomeMain();
+      }
+    }
+
+    if (!isMain) {
+      // Check version of running main instance
+      const mainVersion = await instanceManager.fetchMainVersion();
+      if (mainVersion === InstanceManager.VERSION) {
+        // Proxy mode: forward all requests to main instance
+        const proxyServer = await instanceManager.startProxy();
+        const port = instanceManager.proxyPort;
+        console.log(`[PROXY MODE] Main instance running on port 8989. Proxying on port ${port}.`);
+        // Keep process alive
+        await new Promise(() => { });
+      } else {
+        // Version mismatch: request shutdown, wait, then become main
+        const shutdownOk = await instanceManager.requestMainShutdown();
+        if (shutdownOk) {
+          await instanceManager.waitForPort(10000);
+          await instanceManager.removeLock();
+          isMain = await instanceManager.tryBecomeMain();
+          if (!isMain) {
+            throw new Error("Failed to take over as main instance after shutdown.");
+          }
+        } else {
+          throw new Error("Failed to shutdown old main instance (version mismatch).");
+        }
+      }
+    }
+
+    // Main instance: proceed with normal startup
+    // we only allow stdio mode for main instance
+    // underlying reason is: we are using sqlite3 db which may cause issues for multi writer
+    if (isMain) {
+      if (cliOptions.mode === 'stdio') {
+        // Avoid debug logs in stdio mode
+        await startStdioMode(cliOptions);
+      }
       await startHttpMode(cliOptions.port);
     }
 

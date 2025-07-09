@@ -253,7 +253,7 @@ export class TaskPilotApiClient {
       ? import.meta.env.VITE_MCP_SSE_URL
       : null;
 
-    const sseUrl = envSseUrl || `${this.baseUrl}/sse`
+    const sseUrl = envSseUrl || `${this.baseUrl}/mcp`
     const url = `${sseUrl}${clientId ? `?clientId=${clientId}` : ''}`
 
     console.log(`Connecting to SSE: ${url}`)

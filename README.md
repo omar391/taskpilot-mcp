@@ -30,7 +30,7 @@ npm run dev
 - **Web UI**: http://localhost:8989/
 - **REST API**: http://localhost:8989/api/
 - **Health Check**: http://localhost:8989/health
-- **MCP SSE**: http://localhost:8989/sse
+- **MCP**: http://localhost:8989/mcp
 
 ## 🏗️ Architecture
 

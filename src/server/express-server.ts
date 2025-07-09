@@ -7,7 +7,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { Server as HttpServer } from 'http';
 import { Server as MCPServer } from '@modelcontextprotocol/sdk/server/index.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { 
@@ -32,14 +32,27 @@ export interface MCPToolHandlers {
   handleToolCall: (name: string, args: any) => Promise<any>;
 }
 
+interface MCPSession {
+  transport: StreamableHTTPServerTransport;
+  lastActivity: number;
+}
+
 export class ExpressServer {
   private app: express.Application;
   private httpServer: HttpServer | null = null;
   private mcpServer: MCPServer | null = null;
+  private sessions: Map<string, MCPSession> = new Map();
+  private readonly SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 
   constructor(private options: ExpressServerOptions) {
     this.app = express();
     this.setupMiddleware();
+  }
+
+
+  // Allow registration of custom endpoints (for multi-instance/proxy logic)
+  public registerCustomEndpoints(fn: (app: express.Application) => void): void {
+    fn(this.app);
   }
 
   private setupMiddleware(): void {
@@ -87,47 +100,229 @@ export class ExpressServer {
   }
 
   /**
-   * Setup MCP Server-Sent Events endpoint
+   * Setup MCP HTTP endpoint with streamable transport
    */
-  setupMCPEndpoint(toolHandlers: MCPToolHandlers): void {
-    this.mcpServer = new MCPServer(
-      {
-        name: "taskpilot",
-        version: "0.1.0",
-      },
-      {
-        capabilities: {
-          tools: {},
-        },
+  private cleanupSessions() {
+    const now = Date.now();
+    for (const [sessionId, session] of this.sessions.entries()) {
+      if (now - session.lastActivity > this.SESSION_TIMEOUT) {
+        session.transport.close().catch(console.error);
+        this.sessions.delete(sessionId);
       }
-    );
+    }
+  }
 
-    // Setup MCP handlers
-    this.mcpServer.setRequestHandler(ListToolsRequestSchema, toolHandlers.listTools);
-    this.mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name, arguments: args } = request.params;
-      return await toolHandlers.handleToolCall(name, args);
+  private generateSessionId(): string {
+    return `mcp_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+  }
+
+  private getOrCreateTransport(sessionId?: string): { transport: StreamableHTTPServerTransport; isNew: boolean; sessionId: string } {
+    // Clean up old sessions first
+    this.cleanupSessions();
+
+    // If no session ID provided or invalid, generate a new one
+    if (!sessionId || typeof sessionId !== 'string' || sessionId.trim() === '') {
+      const newSessionId = this.generateSessionId();
+      console.log(`Generating new session ID: ${newSessionId}`);
+      const newTransport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => newSessionId,
+      });
+      return { transport: newTransport, isNew: true, sessionId: newSessionId };
+    }
+
+    // Try to find existing session
+    const existingSession = this.sessions.get(sessionId);
+    if (existingSession) {
+      console.log(`Reusing existing session: ${sessionId}`);
+      existingSession.lastActivity = Date.now();
+      return { transport: existingSession.transport, isNew: false, sessionId };
+    }
+
+    // Create new session with provided ID
+    console.log(`Creating new session with provided ID: ${sessionId}`);
+    const newTransport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => sessionId,
+    });
+    return { transport: newTransport, isNew: true, sessionId };
+  }
+
+  private setupMCPSSE(req: Request, res: Response, sessionId: string): void {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    // Set SSE headers
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'Mcp-Session-Id': sessionId
     });
 
-    // SSE endpoint for MCP
-    this.app.get('/sse', (req, res) => {
+    // Handle client disconnection
+    req.on('close', () => {
+      console.log(`SSE connection closed for session: ${sessionId}`);
+    });
+
+    // Keep the connection alive
+    const keepAlive = setInterval(() => {
+      res.write('\n');
+    }, 30000);
+
+    // Clean up on connection close
+    res.on('close', () => {
+      clearInterval(keepAlive);
+    });
+  }
+
+  private handleDeleteSession(sessionId: string, res: Response): void {
+    console.log(`Received DELETE request for session: ${sessionId}`);
+    
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      console.log(`Session not found: ${sessionId}`);
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    try {
+      // Close the transport
+      session.transport.close().catch(console.error);
+      
+      // Remove the session
+      this.sessions.delete(sessionId);
+      console.log(`Successfully terminated session: ${sessionId}`);
+      
+      res.status(200).json({ message: 'Session terminated' });
+    } catch (error) {
+      console.error(`Error terminating session ${sessionId}:`, error);
+      res.status(500).json({ error: 'Failed to terminate session' });
+    }
+  }
+
+  setupMCPEndpoint(toolHandlers: MCPToolHandlers): void {
+    // Initialize MCP server if not already done
+    if (!this.mcpServer) {
+      this.mcpServer = new MCPServer(
+        {
+          name: "taskpilot",
+          version: "0.1.0",
+        },
+        {
+          capabilities: {
+            tools: {},
+          },
+        }
+      );
+
+      // Setup MCP handlers
+      this.mcpServer.setRequestHandler(ListToolsRequestSchema, toolHandlers.listTools);
+      this.mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
+        const { name, arguments: args } = request.params;
+        return await toolHandlers.handleToolCall(name, args);
+      });
+    }
+
+    // MCP HTTP endpoint with streamable transport
+    this.app.post('/mcp', (req: Request, res: Response) => {
       if (!this.mcpServer) {
         res.status(500).json({ error: 'MCP server not initialized' });
         return;
       }
 
-      try {
-        const transport = new SSEServerTransport('/sse', res);
-        this.mcpServer.connect(transport).catch((error) => {
-          console.error('MCP SSE connection error:', error);
-          if (!res.headersSent) {
-            res.status(500).json({ error: 'Failed to establish MCP connection' });
+      const handleRequest = async () => {
+        const sessionId = req.headers['mcp-session-id'] as string | undefined;
+        console.log(`Processing MCP POST request for session: ${sessionId || 'new session'}`);
+        
+        try {
+          const { transport, isNew, sessionId: resolvedSessionId } = this.getOrCreateTransport(sessionId);
+          
+          if (!resolvedSessionId) {
+            throw new Error('Failed to generate or validate session ID');
           }
-        });
-      } catch (error) {
-        console.error('MCP transport setup error:', error);
-        res.status(500).json({ error: 'Failed to setup MCP transport' });
+          
+          console.log(`Transport created: sessionId=${resolvedSessionId}, isNew=${isNew}`);
+        
+          // If this is a new transport, connect it to the MCP server
+          if (isNew) {
+            console.log('Connecting new transport to MCP server');
+            try {
+              await this.mcpServer!.connect(transport);
+              console.log('Successfully connected transport to MCP server');
+            } catch (connectError) {
+              console.error('Failed to connect transport to MCP server:', connectError);
+              throw new Error(`Failed to connect transport: ${connectError}`);
+            }
+          
+            // Store the session
+            this.sessions.set(resolvedSessionId, {
+              transport,
+              lastActivity: Date.now()
+            });
+
+            // Set the session ID in the response headers
+            res.setHeader('Mcp-Session-Id', resolvedSessionId);
+            console.log(`Set Mcp-Session-Id header: ${resolvedSessionId}`);
+          }
+        
+          console.log('Handling MCP request with transport');
+          // Handle the request with the transport
+          await transport.handleRequest(req, res, req.body);
+          console.log('Successfully handled MCP request');
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          const errorStack = error instanceof Error ? error.stack : undefined;
+          const errorName = error instanceof Error ? error.name : 'Error';
+          
+          console.error('MCP endpoint error:', errorMessage);
+          console.error('Error details:', {
+            message: errorMessage,
+            stack: errorStack,
+            name: errorName
+          });
+          
+          if (!res.headersSent) {
+            try {
+              res.status(500).json({ 
+                error: 'Failed to process MCP request',
+                details: this.options.dev ? errorMessage : undefined,
+                stack: this.options.dev ? errorStack : undefined
+              });
+            } catch (responseError) {
+              console.error('Failed to send error response:', responseError);
+            }
+          }
+        }
+      };
+
+      // Start handling the request
+      handleRequest().catch(console.error);
+    });
+
+    // SSE endpoint for server-to-client messages
+    this.app.get('/mcp', (req: Request, res: Response) => {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      if (!sessionId) {
+        res.status(400).json({ error: 'Mcp-Session-Id header is required' });
+        return;
       }
+
+      console.log(`Setting up SSE for session: ${sessionId}`);
+      this.setupMCPSSE(req, res, sessionId);
+    });
+
+    // Session termination endpoint
+    this.app.delete('/mcp', (req: Request, res: Response) => {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      if (!sessionId) {
+        res.status(400).json({ error: 'Mcp-Session-Id header is required' });
+        return;
+      }
+
+      this.handleDeleteSession(sessionId, res);
     });
   }
 
@@ -171,7 +366,7 @@ export class ExpressServer {
         mode: this.options.dev ? 'development' : 'production',
         endpoints: {
           api: '/api',
-          mcp_sse: '/sse',
+          mcp: '/mcp',
           health: '/health'
         },
         cors: this.options.dev ? 'enabled for localhost development' : 'disabled',
@@ -193,7 +388,7 @@ export class ExpressServer {
       this.httpServer = this.app.listen(this.options.port, () => {
         console.log(`TaskPilot backend server running on http://localhost:${this.options.port}`);
         console.log(`  API: http://localhost:${this.options.port}/api`);
-        console.log(`  MCP SSE: http://localhost:${this.options.port}/sse`);
+        console.log(`  MCP: http://localhost:${this.options.port}/mcp`);
         console.log(`  Health: http://localhost:${this.options.port}/health`);
         if (this.options.dev) {
           console.log(`  CORS: Enabled for localhost development`);
@@ -216,6 +411,16 @@ export class ExpressServer {
    * Stop the server
    */
   async stop(): Promise<void> {
+    // Close all active sessions
+    for (const session of this.sessions.values()) {
+      try {
+        await session.transport.close();
+      } catch (error) {
+        console.error('Error closing session:', error);
+      }
+    }
+    this.sessions.clear();
+
     return new Promise((resolve) => {
       if (this.httpServer) {
         this.httpServer.close(() => {
@@ -249,7 +454,7 @@ export class ExpressServer {
       this.app.use((req, res, next) => {
         // Skip if this is an API route, SSE, health check, or static file
         if (req.path.startsWith('/api') ||
-          req.path.startsWith('/sse') ||
+          req.path.startsWith('/mcp') ||
           req.path.startsWith('/health') ||
           req.path.includes('.') || // Skip requests for files with extensions
           req.method !== 'GET') {   // Only handle GET requests

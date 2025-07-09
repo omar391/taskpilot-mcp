@@ -135,7 +135,7 @@ MODES:
   HTTP Mode (default):
     - Serves UI at http://localhost:<port>/
     - REST API at http://localhost:<port>/api/
-    - MCP via Server-Sent Events at http://localhost:<port>/sse
+    - MCP via Server-Sent Events at http://localhost:<port>/mcp
     
   STDIO Mode:
     - Compatible with MCP clients that expect STDIO transport
