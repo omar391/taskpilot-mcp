@@ -59,19 +59,24 @@ let expressServer: ExpressServer | null = null;
 
 async function initializeServer() {
   try {
+    // DIAGNOSTIC: Check if we're in stdio mode to avoid stdout pollution
+    const cliOptions = parseCliArgs();
+    const isStdioMode = cliOptions.mode === 'stdio';
+
+    console.debug(`[DEBUG] initializeServer called, stdio mode: ${isStdioMode}`);
+
     // Initialize global database using pure Drizzle system
     globalDbService = await initializeGlobalDatabaseService();
     const globalDrizzleManager = globalDbService.getDrizzleManager();
-    
+
     // Create DatabaseService for API endpoints
     databaseService = new DatabaseService(globalDrizzleManager);
-    
-    console.log('Pure TypeScript database system initialized successfully');
+
 
     // Initialize services with pure Drizzle operations
     seedManager = new SeedManager(globalDrizzleManager);
     orchestrator = new PromptOrchestrator(globalDrizzleManager);
-    
+
     // Initialize tools with pure Drizzle database manager
     initTool = new InitTool(globalDrizzleManager);
     startTool = new StartTool(globalDrizzleManager);
@@ -84,12 +89,14 @@ async function initializeServer() {
     githubTool = new GitHubTool(globalDrizzleManager);
     ruleUpdateTool = new RuleUpdateTool(globalDrizzleManager);
     remoteInterfaceTool = new RemoteInterfaceTool(globalDrizzleManager);
-    
+
     // Initialize global seed data using pure TypeScript approach
     await seedManager.initializeGlobalData();
-    console.log('Global seed data loaded successfully');
-    
-    console.log('TaskPilot MCP server initialized successfully (Pure TypeScript/Drizzle ORM)');
+
+    if (!isStdioMode) {
+      console.log('Global seed data loaded successfully');
+      console.log('TaskPilot MCP server initialized successfully (Pure TypeScript/Drizzle ORM)');
+    }
   } catch (error) {
     console.error('Error initializing server:', error);
     throw error;
@@ -277,8 +284,9 @@ function createMCPToolHandlers(): MCPToolHandlers {
 }
 
 async function startStdioMode() {
-  console.log('Starting TaskPilot MCP server in STDIO mode');
-  
+  // POTENTIAL ISSUE: This console.log goes to stdout, violating MCP protocol
+  console.error('[DEBUG] Starting TaskPilot MCP server in STDIO mode (logging to stderr)');
+
   const server = new Server(
     {
       name: "taskpilot",
@@ -298,41 +306,45 @@ async function startStdioMode() {
 
   // Handle tool calls
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    console.debug(`[DEBUG] MCP tool call received: ${request.params.name}`);
     const { name, arguments: args } = request.params;
     return await toolHandlers.handleToolCall(name, args);
   });
 
   // Start the server
   const transport = new StdioServerTransport();
+  console.error('[DEBUG] Connecting to STDIO transport...');
   await server.connect(transport);
-  console.log('TaskPilot MCP server running on stdio');
+
+  // POTENTIAL ISSUE: This console.log goes to stdout, violating MCP protocol
+  console.error('[DEBUG] TaskPilot MCP server running on stdio (logging to stderr)');
 }
 
 async function startHttpMode(port: number) {
   console.log(`Starting TaskPilot integrated server on port ${port}`);
-  
+
   // Ensure port is free (killing any processes using it)
   const portFree = await ensurePortFree(port);
   if (!portFree) {
     throw new Error(`Unable to free port ${port} for TaskPilot server`);
   }
-  
+
   // Create Express server
   expressServer = new ExpressServer({ port, dev: process.env.NODE_ENV !== 'production' });
-  
+
   // Setup MCP endpoint with SSE
   const toolHandlers = createMCPToolHandlers();
   expressServer.setupMCPEndpoint(toolHandlers);
-  
+
   // Setup REST API endpoints
   expressServer.setupAPIEndpoints(databaseService);
 
   // Setup health check
   expressServer.setupHealthCheck();
-  
+
   // Setup graceful shutdown handling with Express server cleanup
   setupGracefulShutdown();
-  
+
   // Start the server
   await expressServer.start();
 }
@@ -376,22 +388,31 @@ async function main() {
   try {
     // Parse CLI arguments
     const cliOptions = parseCliArgs();
-    
+
+    // DIAGNOSTIC: Log parsed CLI options to stderr (not stdout to avoid MCP protocol pollution)
+    console.error(`[DEBUG] Parsed CLI options:`, JSON.stringify(cliOptions, null, 2));
+    console.error(`[DEBUG] Process argv:`, process.argv);
+
     if (cliOptions.help) {
       displayHelp();
       process.exit(0);
     }
-    
+
+    // DIAGNOSTIC: Log mode detection
+    console.error(`[DEBUG] Starting in mode: ${cliOptions.mode}`);
+
     // Initialize server
     await initializeServer();
-    
+
     // Start in appropriate mode
     if (cliOptions.mode === 'stdio') {
+      console.debug(`[DEBUG] Starting STDIO mode for MCP protocol`);
       await startStdioMode();
     } else {
+      console.debug(`[DEBUG] Starting HTTP mode on port ${cliOptions.port}`);
       await startHttpMode(cliOptions.port);
     }
-    
+
   } catch (error) {
     console.error('Error starting server:', error);
     process.exit(1);
