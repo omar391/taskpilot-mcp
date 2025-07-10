@@ -180,7 +180,7 @@ export function HomePage() {
               {activeWorkspaces.map((workspace) => (
                 <Link
                   key={workspace.id}
-                  to="/workspace/$workspaceId/tool-flows"
+                  to="/workspace/$workspaceId/tasks"
                   params={{ workspaceId: workspace.id }}
                   className={`${tailwindClasses.listItem.base} ${tailwindClasses.listItem.hover} block cursor-pointer`}
                 >
@@ -314,7 +314,7 @@ export function HomePage() {
               {inactiveWorkspaces.map((workspace) => (
                 <Link
                   key={workspace.id}
-                  to="/workspace/$workspaceId/tool-flows"
+                  to="/workspace/$workspaceId/tasks"
                   params={{ workspaceId: workspace.id }}
                   className={`${tailwindClasses.listItem.base} ${tailwindClasses.listItem.hover} block cursor-pointer`}
                 >

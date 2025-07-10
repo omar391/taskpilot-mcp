@@ -51,9 +51,10 @@ export function FeedbackStepsPage() {
           throw new Error(feedbackStepsResponse.error)
         }
         
-        const allSteps = feedbackStepsResponse.data.feedbackSteps
-        setGlobalSteps(allSteps.filter(step => step.is_global))
-        setWorkspaceSteps(allSteps.filter(step => !step.is_global && step.workspace_id === workspaceId))
+        // Safely handle the case where data or feedbackSteps might be undefined
+        const allSteps = feedbackStepsResponse.data?.feedbackSteps || []
+        setGlobalSteps(Array.isArray(allSteps) ? allSteps.filter(step => step?.is_global) : [])
+        setWorkspaceSteps(Array.isArray(allSteps) ? allSteps.filter(step => step && !step.is_global && step.workspace_id === workspaceId) : [])
 
         // Mock workspace rules for now (no API endpoint yet)
         const mockWorkspaceRules: WorkspaceRule[] = [

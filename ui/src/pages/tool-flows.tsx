@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToolFlowCard } from '@/components/tool-flow-card'
 import { Button } from '@/components/ui/button'
 import { Plus, Globe, Building } from 'lucide-react'
-import { apiClient, type ToolFlow } from '@/lib/api-client'
+import { apiClient, type ToolFlow, type FeedbackStep } from '@/lib/api-client'
 
 interface ErrorBoundaryProps {
   children: React.ReactNode
@@ -43,7 +43,7 @@ export function ToolFlowsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [availableTools, setAvailableTools] = useState<string[]>([])
-  const [feedbackSteps, setFeedbackSteps] = useState<Record<string, any[]>>({})
+  const [feedbackSteps, setFeedbackSteps] = useState<FeedbackStep[]>([])
   const [isLoadingFeedback, setIsLoadingFeedback] = useState(false)
 
   // Handle clone flow
@@ -64,53 +64,70 @@ export function ToolFlowsPage() {
   
   // Available tools are now included in the tool flows response
 
-  // Fetch feedback steps for a flow
-  const fetchFeedbackSteps = async (flowId: string) => {
+  // Fetch all feedback steps for the workspace
+  const fetchAllFeedbackSteps = async () => {
     try {
-      setIsLoadingFeedback(true)
-      const response = await apiClient.getGlobalToolFlowFeedbackSteps(workspaceId)
-      if (response.error || !response.data?.feedbackStepsByFlow) {
-        throw new Error(response.error || 'Failed to fetch feedback steps')
+      setIsLoadingFeedback(true);
+      // Get all feedback steps for the workspace
+      const response = await apiClient.getFeedbackSteps(workspaceId);
+      
+      if (response.error || !response.data?.feedbackSteps) {
+        console.error('Error fetching feedback steps:', response.error);
+        return [];
       }
-      const steps = response.data.feedbackStepsByFlow[flowId] || []
-      setFeedbackSteps(prev => ({
-        ...prev,
-        [flowId]: steps
-      }))
-      return steps
+      
+      // Ensure we have all required fields for FeedbackStep type
+      const feedbackStepsList = response.data.feedbackSteps.map(step => ({
+        id: step.id,
+        name: step.name || `Feedback Step ${step.id.slice(0, 6)}`,
+        description: step.description || '',
+        template_content: step.template_content || '',
+        variable_schema: step.variable_schema || {},
+        is_global: step.is_global || false,
+        ...(step.workspace_id && { workspace_id: step.workspace_id })
+      }));
+      
+      console.log('Fetched feedback steps:', feedbackStepsList);
+      return feedbackStepsList;
     } catch (err) {
-      console.error(`Failed to fetch feedback steps for flow ${flowId}:`, err)
-      return []
+      console.error('Failed to fetch feedback steps:', err);
+      return [];
     } finally {
-      setIsLoadingFeedback(false)
+      setIsLoadingFeedback(false);
     }
   }
 
   // Handle flow updates
   const handleUpdateFlow = async (flowId: string, updates: Partial<ToolFlow>) => {
     try {
-      setLoading(true)
+      setLoading(true);
       // TODO: Replace with actual API call when available
       // const response = await apiClient.updateToolFlow(workspaceId, flowId, updates)
-      await new Promise(resolve => setTimeout(resolve, 500)) // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API delay
       
       // Update local state
       setGlobalFlows(prev => 
         prev.map(flow => 
           flow.id === flowId ? { ...flow, ...updates } : flow
         )
-      )
+      );
       setWorkspaceFlows(prev => 
         prev.map(flow => 
           flow.id === flowId ? { ...flow, ...updates } : flow
         )
-      )
+      );
+      
+      // If we updated a feedback step, refresh the feedback steps list
+      if ('feedback_step_id' in updates) {
+        const updatedFeedbackSteps = await fetchAllFeedbackSteps();
+        setFeedbackSteps(updatedFeedbackSteps);
+      }
     } catch (err) {
-      console.error('Failed to update flow:', err)
-      setError('Failed to update tool flow. Please try again.')
-      throw err
+      console.error('Failed to update flow:', err);
+      setError('Failed to update tool flow. Please try again.');
+      throw err;
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -139,19 +156,21 @@ export function ToolFlowsPage() {
   useEffect(() => {
     const loadToolFlows = async () => {
       try {
-        setLoading(true)
-        setError(null)
+        setLoading(true);
+        setError(null);
         
-        console.log('Fetching tool flows for workspace:', workspaceId)
-        const response = await apiClient.getToolFlows(workspaceId)
-        console.log('API Response:', response)
+        console.log('Fetching tool flows for workspace:', workspaceId);
+        const [flowsResponse, feedbackStepsResponse] = await Promise.all([
+          apiClient.getToolFlows(workspaceId),
+          apiClient.getFeedbackSteps(workspaceId)
+        ]);
         
-        if (response.error) {
-          throw new Error(response.error)
+        if (flowsResponse.error) {
+          throw new Error(flowsResponse.error);
         }
 
-        // The API now returns separate arrays for global and workspace flows
-        const { global_flows = [], workspace_flows = [], available_tools = [] } = response.data || {};
+        // The API returns separate arrays for global and workspace flows
+        const { global_flows = [], workspace_flows = [], available_tools = [] } = flowsResponse.data || {};
         
         console.log('Global flows from API:', global_flows);
         console.log('Workspace flows from API:', workspace_flows);
@@ -164,16 +183,31 @@ export function ToolFlowsPage() {
         setGlobalFlows(global_flows);
         setWorkspaceFlows(workspace_flows);
         
+        // Process feedback steps
+        if (!feedbackStepsResponse.error && feedbackStepsResponse.data?.feedbackSteps) {
+          const feedbackStepsList = feedbackStepsResponse.data.feedbackSteps.map(step => ({
+            id: step.id,
+            name: step.name || `Feedback Step ${step.id.slice(0, 6)}`,
+            description: step.description || '',
+            template_content: step.template_content || '',
+            variable_schema: step.variable_schema || {},
+            is_global: step.is_global || false,
+            ...(step.workspace_id && { workspace_id: step.workspace_id })
+          }));
+          setFeedbackSteps(feedbackStepsList);
+          console.log('Fetched feedback steps:', feedbackStepsList);
+        }
+        
       } catch (err) {
-        console.error('Error loading tool flows:', err)
-        setError(err instanceof Error ? err.message : 'Failed to load tool flows')
+        console.error('Error loading tool flows:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load tool flows');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    loadToolFlows()
-  }, [workspaceId])
+    loadToolFlows();
+  }, [workspaceId]);
 
   if (loading || isLoadingFeedback) {
     return (
@@ -244,24 +278,29 @@ export function ToolFlowsPage() {
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {globalFlows.map((flow) => (
-                  <ToolFlowCard 
-                    key={flow.id}
-                    flow={flow}
-                    feedbackSteps={feedbackSteps[flow.id] || []}
-                    availableTools={availableTools}
-                    isEditable={!flow.is_global}
-                    onUpdate={handleUpdateFlow}
-                    onDelete={handleDeleteFlow}
-                    onClone={!flow.is_global ? undefined : handleCloneFlow}
-                    onEdit={() => {
-                      // Load feedback steps when editing
-                      if (!feedbackSteps[flow.id]) {
-                        fetchFeedbackSteps(flow.id)
-                      }
-                    }}
-                  />
-                ))}
+                {globalFlows.map((flow) => {
+                  // Find the feedback step for this flow
+                  const flowFeedbackStep = flow.feedback_step_id 
+                    ? feedbackSteps.find(step => step.id === flow.feedback_step_id) 
+                    : null;
+                  
+                  return (
+                    <ToolFlowCard 
+                      key={flow.id}
+                      flow={flow}
+                      feedbackSteps={flowFeedbackStep ? [flowFeedbackStep] : []}
+                      availableTools={availableTools}
+                      isEditable={!flow.is_global}
+                      onUpdate={handleUpdateFlow}
+                      onDelete={handleDeleteFlow}
+                      onClone={!flow.is_global ? undefined : handleCloneFlow}
+                      onEdit={() => {
+                        // Refresh feedback steps when editing
+                        fetchAllFeedbackSteps();
+                      }}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>
@@ -282,24 +321,29 @@ export function ToolFlowsPage() {
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {workspaceFlows.map((flow) => (
-                  <ToolFlowCard 
-                    key={flow.id}
-                    flow={flow}
-                    feedbackSteps={feedbackSteps[flow.id] || []}
-                    availableTools={availableTools}
-                    isEditable={!flow.is_global}
-                    onUpdate={handleUpdateFlow}
-                    onDelete={handleDeleteFlow}
-                    onClone={!flow.is_global ? undefined : handleCloneFlow}
-                    onEdit={() => {
-                      // Load feedback steps when editing
-                      if (!feedbackSteps[flow.id]) {
-                        fetchFeedbackSteps(flow.id)
-                      }
-                    }}
-                  />
-                ))}
+                {workspaceFlows.map((flow) => {
+                  // Find the feedback step for this flow
+                  const flowFeedbackStep = flow.feedback_step_id 
+                    ? feedbackSteps.find(step => step.id === flow.feedback_step_id) 
+                    : null;
+                  
+                  return (
+                    <ToolFlowCard 
+                      key={flow.id}
+                      flow={flow}
+                      feedbackSteps={flowFeedbackStep ? [flowFeedbackStep] : []}
+                      availableTools={availableTools}
+                      isEditable={!flow.is_global}
+                      onUpdate={handleUpdateFlow}
+                      onDelete={handleDeleteFlow}
+                      onClone={!flow.is_global ? undefined : handleCloneFlow}
+                      onEdit={() => {
+                        // Refresh feedback steps when editing
+                        fetchAllFeedbackSteps();
+                      }}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>

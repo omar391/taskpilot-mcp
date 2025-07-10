@@ -442,9 +442,9 @@ export class GlobalDatabaseService {
         ))
         .orderBy(asc(feedbackSteps.name));
     } else {
+      // When no workspaceId is provided, return all feedback steps (both global and workspace-specific)
       return db.select()
         .from(feedbackSteps)
-        .where(eq(feedbackSteps.isGlobal, true))
         .orderBy(asc(feedbackSteps.name));
     }
   }

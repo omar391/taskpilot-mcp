@@ -252,7 +252,47 @@ export class TaskPilotApiClient {
   // ========================================
 
   async getFeedbackSteps(workspaceId: string): Promise<ApiResponse<{ feedbackSteps: FeedbackStep[] }>> {
-    return this.makeRequest<{ feedbackSteps: FeedbackStep[] }>(`/api/workspaces/${workspaceId}/feedback-steps`)
+    const response = await this.makeRequest<{
+      global_steps: Array<{
+        id: string;
+        name: string;
+        description: string;
+        template_content: string;
+        variable_schema: Record<string, any>;
+        is_global: boolean;
+      }>;
+      workspace_steps: Array<{
+        id: string;
+        name: string;
+        description: string;
+        template_content: string;
+        variable_schema: Record<string, any>;
+        is_global: boolean;
+        workspace_id?: string;
+      }>;
+    }>(`/api/workspaces/${workspaceId}/feedback-steps`);
+
+    if (response.error) {
+      return { data: { feedbackSteps: [] }, error: response.error };
+    }
+
+    // Map the API response to the expected FeedbackStep format
+    const globalSteps = (response.data?.global_steps || []).map(step => ({
+      ...step,
+      is_global: true,
+    }));
+
+    const workspaceSteps = (response.data?.workspace_steps || []).map(step => ({
+      ...step,
+      is_global: false,
+      workspace_id: step.workspace_id,
+    }));
+
+    return {
+      data: {
+        feedbackSteps: [...globalSteps, ...workspaceSteps],
+      },
+    };
   }
 
   // ========================================
@@ -370,9 +410,63 @@ export class TaskPilotApiClient {
 
   // Fetch feedback steps for all global tool flows
   async getGlobalToolFlowFeedbackSteps(workspaceId: string): Promise<ApiResponse<{ feedbackStepsByFlow: Record<string, any[]> }>> {
-    return this.makeRequest<{ feedbackStepsByFlow: Record<string, any[]> }>(
-      `/api/workspaces/${workspaceId}/tool-flows/global-feedback-steps`
-    );
+    try {
+      // First, get all feedback steps
+      const response = await this.makeRequest<{ 
+        global_steps: Array<{ id: string; name: string }>,
+        workspace_steps: Array<{ id: string; name: string }>
+      }>(`/api/workspaces/${workspaceId}/feedback-steps`);
+
+      if (response.error) {
+        return { data: { feedbackStepsByFlow: {} }, error: response.error };
+      }
+
+      // Get all tool flows to map feedback steps to
+      const toolFlowsResponse = await this.getToolFlows(workspaceId);
+      if (toolFlowsResponse.error) {
+        return { data: { feedbackStepsByFlow: {} }, error: toolFlowsResponse.error };
+      }
+
+      // Create a map of flowId to its feedback steps
+      const feedbackStepsByFlow: Record<string, any[]> = {};
+      
+      // Initialize with empty arrays for all flows
+      toolFlowsResponse.data?.global_flows?.forEach(flow => {
+        feedbackStepsByFlow[flow.id] = [];
+      });
+      toolFlowsResponse.data?.workspace_flows?.forEach(flow => {
+        feedbackStepsByFlow[flow.id] = [];
+      });
+
+      // Add feedback steps to their respective flows
+      const allFeedbackSteps = [
+        ...(response.data?.global_steps || []),
+        ...(response.data?.workspace_steps || [])
+      ];
+
+      // For each flow, find its feedback steps
+      Object.keys(feedbackStepsByFlow).forEach(flowId => {
+        const flow = [
+          ...(toolFlowsResponse.data?.global_flows || []),
+          ...(toolFlowsResponse.data?.workspace_flows || [])
+        ].find(f => f.id === flowId);
+
+        if (flow?.feedback_step_id) {
+          const step = allFeedbackSteps.find(s => s.id === flow.feedback_step_id);
+          if (step) {
+            feedbackStepsByFlow[flowId] = [{
+              id: step.id,
+              name: step.name || `Feedback Step ${step.id.slice(0, 6)}`
+            }];
+          }
+        }
+      });
+
+      return { data: { feedbackStepsByFlow } };
+    } catch (error) {
+      console.error('Error in getGlobalToolFlowFeedbackSteps:', error);
+      return { data: { feedbackStepsByFlow: {} }, error: 'Failed to fetch feedback steps' };
+    }
   }
 }
 

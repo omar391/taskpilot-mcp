@@ -28,22 +28,22 @@ export function FeedbackEditor({
 }: FeedbackEditorProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isTemplateExpanded, setIsTemplateExpanded] = useState(false)
-  const [editedTemplate, setEditedTemplate] = useState(feedbackStep.template_content)
-  const [editedDescription, setEditedDescription] = useState(feedbackStep.description)
+  const [editedTemplate, setEditedTemplate] = useState(feedbackStep.template_content || '')
+  const [editedDescription, setEditedDescription] = useState(feedbackStep.description || '')
 
   const handleSave = () => {
     if (onSave) {
       onSave({
-        template_content: editedTemplate,
-        description: editedDescription
+        template_content: editedTemplate || '',
+        description: editedDescription || ''
       })
     }
     setIsEditing(false)
   }
 
   const handleCancel = () => {
-    setEditedTemplate(feedbackStep.template_content)
-    setEditedDescription(feedbackStep.description)
+    setEditedTemplate(feedbackStep.template_content || '')
+    setEditedDescription(feedbackStep.description || '')
     setIsEditing(false)
     if (onCancel) {
       onCancel()
@@ -57,9 +57,15 @@ export function FeedbackEditor({
     }
   }
 
-  const extractVariables = (template: string): string[] => {
-    const matches = template.match(/\{\{context\.(\w+)\}\}/g) || []
-    return [...new Set(matches.map(match => match.replace(/[{}]/g, '').replace('context.', '')))]
+  const extractVariables = (template: string | undefined): string[] => {
+    if (!template) return [];
+    try {
+      const matches = template.match(/\{\{context\.(\w+)\}\}/g) || [];
+      return [...new Set(matches.map(match => match.replace(/[{}]/g, '').replace('context.', '')))];
+    } catch (error) {
+      console.error('Error extracting variables:', error);
+      return [];
+    }
   }
 
   const variables = extractVariables(isEditing ? editedTemplate : feedbackStep.template_content)
@@ -192,7 +198,7 @@ export function FeedbackEditor({
                 <div className="p-3 bg-muted/50 rounded-lg border border-dashed border-muted-foreground/30">
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">
-                      Template content ({feedbackStep.template_content.split('\n').length} lines)
+                      Template content ({(feedbackStep.template_content || '').split('\n').length} lines)
                     </p>
                     <Button
                       variant="ghost"

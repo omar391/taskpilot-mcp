@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { Plus, CheckCircle, Clock, AlertCircle, Calendar } from 'lucide-react'
+import { CheckCircle, Clock, AlertCircle, Calendar } from 'lucide-react'
+import { TaskCreationDialog } from '@/components/task-creation-dialog'
 import { apiClient, type Task, type WorkspaceMetadata } from '@/lib/api-client'
 
 export function TasksPage() {
@@ -14,6 +15,7 @@ export function TasksPage() {
   const [workspaces, setWorkspaces] = useState<WorkspaceMetadata[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [, setIsCreatingTask] = useState(false)
 
   // Load tasks from API
   useEffect(() => {
@@ -262,10 +264,27 @@ export function TasksPage() {
             </p>
           </div>
         </div>
-        <Button size="sm" className="rounded-xl shadow-sm">
-          <Plus size={16} className="mr-2" />
-          New Task
-        </Button>
+        <TaskCreationDialog
+          buttonText="Create Task"
+          buttonVariant="default"
+          className="rounded-xl shadow-sm"
+          onTaskCreated={async (newTask) => {
+            setIsCreatingTask(true)
+            try {
+              // TODO: Replace with actual API call when available
+              console.log('Creating task:', newTask)
+              // Simulate API call
+              await new Promise(resolve => setTimeout(resolve, 1000))
+              // Refresh tasks after creation
+              window.location.reload()
+            } catch (error) {
+              console.error('Failed to create task:', error)
+              setError('Failed to create task. Please try again.')
+            } finally {
+              setIsCreatingTask(false)
+            }
+          }}
+        />
       </div>
 
       {/* Workspace Context */}
@@ -333,10 +352,27 @@ export function TasksPage() {
                   <p className="text-muted-foreground text-sm mb-4">
                     Create your first task to get started with this workspace.
                   </p>
-                  <Button className="rounded-xl">
-                    <Plus size={16} className="mr-2" />
-                    Create Task
-                  </Button>
+                  <TaskCreationDialog
+                    buttonText="Create Task"
+                    buttonVariant="default"
+                    className="rounded-xl"
+                    onTaskCreated={async (newTask) => {
+                      setIsCreatingTask(true)
+                      try {
+                        // TODO: Replace with actual API call when available
+                        console.log('Creating task:', newTask)
+                        // Simulate API call
+                        await new Promise(resolve => setTimeout(resolve, 1000))
+                        // Refresh tasks after creation
+                        window.location.reload()
+                      } catch (error) {
+                        console.error('Failed to create task:', error)
+                        setError('Failed to create task. Please try again.')
+                      } finally {
+                        setIsCreatingTask(false)
+                      }
+                    }}
+                  />
                 </div>
               ) : (
                 <div className="space-y-4">

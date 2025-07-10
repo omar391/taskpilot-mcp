@@ -1,8 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Copy, Edit, Settings } from 'lucide-react'
+import * as React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Copy, Edit, Settings } from 'lucide-react';
+import type { FeedbackStep } from '@/lib/api-client';
 
 interface ToolFlow {
   id: string
@@ -14,11 +16,7 @@ interface ToolFlow {
   workspace_id?: string
 }
 
-interface FeedbackStep {
-  id: string
-  name: string
-  description: string
-}
+// Using the imported FeedbackStep type from api-client
 
 interface ToolFlowCardProps {
   flow: ToolFlow
@@ -41,7 +39,11 @@ export function ToolFlowCard({
   onUpdate,
   onDelete
 }: ToolFlowCardProps) {
-  const selectedFeedbackStep = feedbackSteps.find(step => step.id === flow.feedback_step_id)
+  // Find the selected feedback step with proper type checking
+  const selectedFeedbackStep = React.useMemo(() => {
+    if (!flow.feedback_step_id || !Array.isArray(feedbackSteps)) return null;
+    return feedbackSteps.find(step => step.id === flow.feedback_step_id) || null;
+  }, [flow.feedback_step_id, feedbackSteps]);
   
   const handleFeedbackStepChange = (stepId: string) => {
     if (isEditable && onUpdate) {
@@ -51,7 +53,7 @@ export function ToolFlowCard({
 
   const handleNextToolChange = (toolName: string) => {
     if (isEditable && onUpdate) {
-      onUpdate(flow.id, { next_tool: toolName === 'end' ? null : toolName })
+      onUpdate(flow.id, { next_tool: toolName === 'none' ? null : toolName })
     }
   }
 
@@ -78,8 +80,11 @@ export function ToolFlowCard({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onClone(flow)}
-                className="h-8 px-3"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClone(flow);
+                }}
+                className="h-8 px-3 hover:cursor-pointer hover:bg-accent"
               >
                 <Copy size={14} className="mr-1" />
                 Clone
@@ -101,64 +106,94 @@ export function ToolFlowCard({
       </CardHeader>
 
       <CardContent className="space-y-3">
-        {/* Horizontal 3-column workflow */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* Horizontal workflow with arrows */}
+        <div className="flex items-stretch">
           {/* Column 1: Tool Function */}
-          <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border-t-2 border-blue-500">
+          <div className="relative flex-1 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-l-lg border-t-2 border-blue-500">
             <div className="text-center">
               <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold mx-auto mb-2">
-                1
+                🛠️
               </div>
               <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">Tool</p>
               <p className="text-xs text-blue-600 dark:text-blue-400 font-mono truncate" title={flow.tool_name}>
                 {flow.tool_name}
               </p>
             </div>
+            {/* Arrow to next step */}
+            <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2 w-4 h-4 text-blue-500">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
+              </svg>
+            </div>
           </div>
 
           {/* Column 2: Feedback Step */}
-          <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border-t-2 border-green-500">
+          <div className="relative flex-1 p-3 bg-green-50 dark:bg-green-950/30 border-t-2 border-green-500">
             <div className="text-center">
               <div className="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-bold mx-auto mb-2">
-                2
+                🔄
               </div>
               <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">Feedback</p>
               {isEditable ? (
-                <Select value={flow.feedback_step_id || 'none'} onValueChange={handleFeedbackStepChange}>
+                <Select 
+                  value={flow.feedback_step_id || 'none'} 
+                  onValueChange={handleFeedbackStepChange}
+                  disabled={!isEditable}
+                >
                   <SelectTrigger className="h-6 text-xs bg-background">
-                    <SelectValue placeholder="Select..." />
+                    <SelectValue placeholder="Select...">
+                      {selectedFeedbackStep?.name || 'No Feedback Step'}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {feedbackSteps.map((step) => (
+                    <SelectItem value="none">No Feedback Step</SelectItem>
+                    {Array.isArray(feedbackSteps) && feedbackSteps.map((step) => (
                       <SelectItem key={step.id} value={step.id}>
-                        {step.name}
+                        {step.name} {step.is_global ? '(Global)' : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               ) : (
-                <p className="text-xs text-green-600 dark:text-green-400 truncate" title={selectedFeedbackStep?.name || 'None'}>
-                  {selectedFeedbackStep?.name || 'None'}
-                </p>
+                <div className="min-h-6 flex items-center">
+                  <p 
+                    className={`text-xs truncate ${
+                      selectedFeedbackStep 
+                        ? 'text-green-600 dark:text-green-400' 
+                        : 'text-muted-foreground italic'
+                    }`} 
+                    title={selectedFeedbackStep?.name || 'No feedback step configured'}
+                  >
+                    {selectedFeedbackStep?.name || 'None'}
+                  </p>
+                </div>
               )}
+            </div>
+            {/* Arrow to next step */}
+            <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2 w-4 h-4 text-green-500">
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
+              </svg>
             </div>
           </div>
 
           {/* Column 3: Next Action */}
-          <div className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg border-t-2 border-orange-500">
+          <div className="flex-1 p-3 bg-orange-50 dark:bg-orange-950/30 rounded-r-lg border-t-2 border-orange-500">
             <div className="text-center">
               <div className="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-bold mx-auto mb-2">
-                3
+                ⏭️
               </div>
               <p className="text-xs font-medium text-orange-700 dark:text-orange-300 mb-1">Next</p>
               {isEditable ? (
-                <Select value={flow.next_tool || 'end'} onValueChange={handleNextToolChange}>
+                <Select 
+                  value={flow.next_tool || 'none'} 
+                  onValueChange={handleNextToolChange}
+                >
                   <SelectTrigger className="h-6 text-xs bg-background">
-                    <SelectValue placeholder="Select..." />
+                    <SelectValue placeholder="Select next tool..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="end">End workflow</SelectItem>
+                    <SelectItem value="none">None (End of Flow)</SelectItem>
                     {availableTools.map((tool) => (
                       <SelectItem key={tool} value={tool}>
                         {tool}
