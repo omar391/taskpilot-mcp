@@ -1,12 +1,12 @@
-import { eq, and, or, desc, asc, isNull, isNotNull } from 'drizzle-orm';
+import { eq, and, or, desc, asc, isNull, isNotNull, inArray, notInArray, sql } from 'drizzle-orm';
 import { DrizzleDatabaseManager, getWorkspaceDatabase } from './drizzle-connection.js';
-import { 
-  tasks, 
-  githubConfigs, 
-  remoteInterfaces, 
-  workspaceToolFlows, 
-  workspaceFeedbackSteps, 
-  type Task, 
+import {
+  tasks,
+  githubConfigs,
+  remoteInterfaces,
+  workspaceToolFlows,
+  workspaceFeedbackSteps,
+  type Task,
   type NewTask,
   type GithubConfig,
   type NewGithubConfig,
@@ -19,6 +19,8 @@ import {
 } from './schema/workspace-schema.js';
 
 export class WorkspaceDatabaseService {
+
+  // ========== CONSTRUCTOR & DB INIT ==========
   private db: DrizzleDatabaseManager;
 
   constructor(workspacePath: string, dbInstance?: DrizzleDatabaseManager) {
@@ -35,6 +37,43 @@ export class WorkspaceDatabaseService {
   // ========================================
   // TASK OPERATIONS
   // ========================================
+  /**
+   * Get paginated tasks with optional status filter
+   */
+  async getTasksPaginated(status: string | undefined, limit: number, offset: number): Promise<Task[]> {
+    const db = this.db.getDb();
+    let whereClause = undefined;
+    if (status === 'current') {
+      whereClause = notInArray(tasks.status, ['done', 'dropped']);
+    } else if (status === 'history') {
+      whereClause = inArray(tasks.status, ['done', 'dropped']);
+    }
+    return db
+      .select()
+      .from(tasks)
+      .where(whereClause)
+      .orderBy(desc(tasks.updatedAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  /**
+   * Count tasks with optional status filter
+   */
+  async countTasks(status: string | undefined): Promise<number> {
+    const db = this.db.getDb();
+    let whereClause;
+    if (status === 'current') {
+      whereClause = notInArray(tasks.status, ['done', 'dropped']);
+    } else if (status === 'history') {
+      whereClause = inArray(tasks.status, ['done', 'dropped']);
+    }
+    const result = await db
+      .select({ total: sql<number>`count(*) as total` })
+      .from(tasks)
+      .where(whereClause);
+    return result?.[0]?.total ?? 0;
+  }
 
   /**
    * Create a new task
@@ -104,12 +143,12 @@ export class WorkspaceDatabaseService {
   async updateTask(id: string, updates: Partial<Omit<Task, 'id' | 'createdAt'>>): Promise<Task | null> {
     const db = this.db.getDb();
     const updateData = { ...updates, updatedAt: new Date().toISOString() };
-    
+
     // If status is being changed to 'done', set completedAt
     if (updates.status === 'done' && !updates.completedAt) {
       updateData.completedAt = new Date().toISOString();
     }
-    
+
     const [result] = await db.update(tasks)
       .set(updateData)
       .where(eq(tasks.id, id))
@@ -122,17 +161,17 @@ export class WorkspaceDatabaseService {
    */
   async updateTaskProgress(id: string, progress: number): Promise<Task | null> {
     const db = this.db.getDb();
-    const updateData: any = { 
-      progress, 
-      updatedAt: new Date().toISOString() 
+    const updateData: any = {
+      progress,
+      updatedAt: new Date().toISOString()
     };
-    
+
     // If progress is 100%, mark as done
     if (progress >= 100) {
       updateData.status = 'done';
       updateData.completedAt = new Date().toISOString();
     }
-    
+
     const [result] = await db.update(tasks)
       .set(updateData)
       .where(eq(tasks.id, id))
@@ -393,36 +432,36 @@ export class WorkspaceDatabaseService {
   }> {
     const db = this.db.getDb();
     const allTasks = await db.select().from(tasks);
-    
+
     const stats = {
       total: allTasks.length,
       byStatus: {} as Record<string, number>,
       byPriority: {} as Record<string, number>,
       completionRate: 0
     };
-    
+
     let completedCount = 0;
-    
+
     for (const task of allTasks) {
       // Count by status
       if (task.status) {
         stats.byStatus[task.status] = (stats.byStatus[task.status] || 0) + 1;
       }
-      
+
       // Count by priority
       if (task.priority) {
         stats.byPriority[task.priority] = (stats.byPriority[task.priority] || 0) + 1;
       }
-      
+
       // Count completed tasks
       if (task.status === 'done') {
         completedCount++;
       }
     }
-    
+
     // Calculate completion rate
     stats.completionRate = stats.total > 0 ? (completedCount / stats.total) * 100 : 0;
-    
+
     return stats;
   }
 

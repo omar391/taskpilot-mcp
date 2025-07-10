@@ -57,6 +57,45 @@ export function createApiRouter(databaseService: DatabaseService): Router {
     } catch (error) {
       next(error);
     }
+// Get feedback steps for all global tool flows
+router.get(
+  '/workspaces/:workspaceId/tool-flows/global-feedback-steps',
+  readRateLimit,
+  validateWorkspaceId,
+  async (req, res, next) => {
+    try {
+      await toolFlowsController.getGlobalToolFlowFeedbackSteps(req, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+// Delete a global tool flow
+router.delete(
+  '/workspaces/:workspaceId/tool-flows/:flowId',
+  writeRateLimit,
+  validateWorkspaceId,
+  async (req, res, next) => {
+    try {
+      await toolFlowsController.deleteToolFlow(req, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+// Clone a global tool flow to a workspace
+router.post(
+  '/workspaces/:workspaceId/tool-flows/:flowId/clone',
+  writeRateLimit,
+  validateWorkspaceId,
+  async (req, res, next) => {
+    try {
+      await toolFlowsController.cloneToolFlow(req, res);
+    } catch (error) {
+      next(error);
+    }
+  }
+);
   });
 
   // 3. GET /api/workspaces/{id}/tool-flows - Get tool flows for workspace

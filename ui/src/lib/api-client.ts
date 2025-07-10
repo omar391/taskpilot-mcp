@@ -135,7 +135,7 @@ export class TaskPilotApiClient {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`
-    
+
     const defaultOptions: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
@@ -167,7 +167,7 @@ export class TaskPilotApiClient {
 
       } catch (error) {
         lastError = error instanceof Error ? error : new Error('Unknown error')
-        
+
         if (attempt < this.retryAttempts) {
           await this.delay(this.retryDelay * Math.pow(2, attempt))
         }
@@ -218,7 +218,7 @@ export class TaskPilotApiClient {
   // Tool Flow API
   // ========================================
 
-  async getToolFlows(workspaceId: string): Promise<ApiResponse<{ 
+  async getToolFlows(workspaceId: string): Promise<ApiResponse<{
     global_flows: ToolFlow[];
     workspace_flows: ToolFlow[];
     available_tools: string[];
@@ -238,6 +238,13 @@ export class TaskPilotApiClient {
         path: string;
       };
     }>(`/api/workspaces/${workspaceId}/tool-flows`)
+  }
+
+  async createToolFlow(workspaceId: string, flow: Partial<ToolFlow>): Promise<ApiResponse<{ toolFlow: ToolFlow }>> {
+    return this.makeRequest<{ toolFlow: ToolFlow }>(`/api/workspaces/${workspaceId}/tool-flows`, {
+      method: 'POST',
+      body: JSON.stringify(flow),
+    })
   }
 
   // ========================================
@@ -310,7 +317,7 @@ export class TaskPilotApiClient {
     if (!this.sseEventHandlers.has(eventType)) {
       this.sseEventHandlers.set(eventType, new Set())
     }
-    
+
     this.sseEventHandlers.get(eventType)!.add(handler)
 
     // Return cleanup function
@@ -344,6 +351,28 @@ export class TaskPilotApiClient {
   destroy(): void {
     this.disconnectSSE()
     this.sseEventHandlers.clear()
+  }
+  // Clone a global tool flow to a workspace
+  async cloneToolFlow(workspaceId: string, flowId: string): Promise<ApiResponse<{ toolFlow: ToolFlow }>> {
+    return this.makeRequest<{ toolFlow: ToolFlow }>(
+      `/api/workspaces/${workspaceId}/tool-flows/${flowId}/clone`,
+      { method: 'POST' }
+    );
+  }
+
+  // Delete a global tool flow
+  async deleteToolFlow(workspaceId: string, flowId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return this.makeRequest<{ success: boolean }>(
+      `/api/workspaces/${workspaceId}/tool-flows/${flowId}`,
+      { method: 'DELETE' }
+    );
+  }
+
+  // Fetch feedback steps for all global tool flows
+  async getGlobalToolFlowFeedbackSteps(workspaceId: string): Promise<ApiResponse<{ feedbackStepsByFlow: Record<string, any[]> }>> {
+    return this.makeRequest<{ feedbackStepsByFlow: Record<string, any[]> }>(
+      `/api/workspaces/${workspaceId}/tool-flows/global-feedback-steps`
+    );
   }
 }
 

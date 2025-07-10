@@ -49,27 +49,11 @@ export function ToolFlowsPage() {
   // Handle clone flow
   const handleCloneFlow = async (flow: ToolFlow) => {
     try {
-      // TODO: Replace with actual API call when available
-      // const response = await apiClient.cloneToolFlow(workspaceId, flow.id)
-      // Add the cloned flow to the appropriate list
-      
-      // For now, simulate API call with timeout
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      // Create a new flow with the same properties but new ID
-      const clonedFlow = {
-        ...flow,
-        id: `cloned_${Date.now()}`,
-        is_global: false, // Cloned flows should be workspace-specific
-        workspace_id: workspaceId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+      const response = await apiClient.cloneToolFlow(workspaceId, flow.id)
+      if (response.error || !response.data?.toolFlow) {
+        throw new Error(response.error || 'Failed to clone flow')
       }
-      
-      // Add to workspace flows (since cloned flows are always workspace-specific)
-      setWorkspaceFlows(prev => [...prev, clonedFlow])
-      
-      // Show success message
+      setWorkspaceFlows(prev => [...prev, response.data.toolFlow])
       // TODO: Replace with toast notification
       console.log('Flow cloned successfully')
     } catch (err) {
@@ -84,19 +68,16 @@ export function ToolFlowsPage() {
   const fetchFeedbackSteps = async (flowId: string) => {
     try {
       setIsLoadingFeedback(true)
-      // TODO: Replace with actual API call when available
-      // const response = await apiClient.getFeedbackSteps(flowId)
-      await new Promise(resolve => setTimeout(resolve, 300)) // Simulate API delay
-      // Mock data - replace with actual API response
-      const mockSteps = [
-        { id: 'step1', name: 'Code Review', description: 'Review the generated code' },
-        { id: 'step2', name: 'Testing', description: 'Test the implementation' }
-      ]
+      const response = await apiClient.getGlobalToolFlowFeedbackSteps(workspaceId)
+      if (response.error || !response.data?.feedbackStepsByFlow) {
+        throw new Error(response.error || 'Failed to fetch feedback steps')
+      }
+      const steps = response.data.feedbackStepsByFlow[flowId] || []
       setFeedbackSteps(prev => ({
         ...prev,
-        [flowId]: mockSteps
+        [flowId]: steps
       }))
-      return mockSteps
+      return steps
     } catch (err) {
       console.error(`Failed to fetch feedback steps for flow ${flowId}:`, err)
       return []
@@ -138,14 +119,12 @@ export function ToolFlowsPage() {
     if (!confirm('Are you sure you want to delete this tool flow? This action cannot be undone.')) {
       return
     }
-
     try {
       setLoading(true)
-      // TODO: Replace with actual API call when available
-      // await apiClient.deleteToolFlow(workspaceId, flowId)
-      await new Promise(resolve => setTimeout(resolve, 300)) // Simulate API delay
-      
-      // Update local state
+      const response = await apiClient.deleteToolFlow(workspaceId, flowId)
+      if (response.error || !response.data?.success) {
+        throw new Error(response.error || 'Failed to delete flow')
+      }
       setGlobalFlows(prev => prev.filter(flow => flow.id !== flowId))
       setWorkspaceFlows(prev => prev.filter(flow => flow.id !== flowId))
     } catch (err) {
@@ -215,19 +194,20 @@ export function ToolFlowsPage() {
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
               </svg>
             </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Error loading tool flows</h3>
-              <div className="mt-2 text-sm text-red-700">
-                <p>{error}</p>
-              </div>
-              <div className="mt-4">
+            <div className="ml-3 flex-1">
+              <div className="flex justify-between items-start">
+                <h3 className="text-sm font-medium text-red-800">Error</h3>
                 <button
                   type="button"
-                  className="rounded-md bg-red-50 px-2 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100"
-                  onClick={() => window.location.reload()}
+                  className="ml-4 rounded-md bg-red-50 px-2 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100"
+                  onClick={() => setError(null)}
+                  aria-label="Dismiss error"
                 >
-                  Reload page
+                  Dismiss
                 </button>
+              </div>
+              <div className="mt-2 text-sm text-red-700">
+                <p>{error}</p>
               </div>
             </div>
           </div>

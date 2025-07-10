@@ -35,14 +35,24 @@ export function CloneToWorkspace({
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>('')
   const [isCloning, setIsCloning] = useState(false)
   const [isCloned, setIsCloned] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editedToolName, setEditedToolName] = useState(flow.tool_name)
+  const [editedDescription, setEditedDescription] = useState(flow.description)
 
-  const handleClone = async () => {
+  const handleClone = () => {
     if (!selectedWorkspace) return
+    setShowEditModal(true)
+  }
 
+  const handleSaveClone = async () => {
     setIsCloning(true)
     try {
-      await onClone(flow.id, selectedWorkspace)
+      await onClone(
+        flow.id,
+        selectedWorkspace
+      )
       setIsCloned(true)
+      setShowEditModal(false)
       setTimeout(() => {
         onClose()
       }, 1500)
@@ -72,9 +82,10 @@ export function CloneToWorkspace({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
           <Copy size={20} />
           Clone to Workspace
         </CardTitle>
@@ -128,12 +139,44 @@ export function CloneToWorkspace({
           <Button
             onClick={handleClone}
             disabled={!selectedWorkspace || isCloning}
-            className="flex-1"
+            className="flex-1 cursor-pointer"
           >
             {isCloning ? 'Cloning...' : 'Clone Flow'}
           </Button>
         </div>
       </CardContent>
     </Card>
-  )
+    {showEditModal && (
+      <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-30 z-50">
+        <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+          <h2 className="text-lg font-semibold mb-4">Edit Cloned Tool Flow</h2>
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">Tool Name</label>
+            <input
+              className="w-full border rounded px-2 py-1"
+              value={editedToolName}
+              onChange={e => setEditedToolName(e.target.value)}
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1">Description</label>
+            <textarea
+              className="w-full border rounded px-2 py-1"
+              value={editedDescription}
+              onChange={e => setEditedDescription(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setShowEditModal(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveClone} disabled={isCloning}>
+              {isCloning ? 'Saving...' : 'Save to Workspace'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
+  );
 }

@@ -1,26 +1,26 @@
 import { eq, and, or, desc, asc, isNull, isNotNull } from 'drizzle-orm';
 import { DrizzleDatabaseManager, getGlobalDatabase } from './drizzle-connection.js';
-import { 
-  workspaces, 
-  sessions, 
-  toolFlows, 
+import {
+  workspaces,
+  sessions,
+  toolFlows,
   toolFlowSteps,
-  feedbackSteps, 
-  mcpServerMappings 
+  feedbackSteps,
+  mcpServerMappings
 } from './schema/global-schema.js';
-import type { 
-  Workspace, 
-  NewWorkspace, 
-  Session, 
-  NewSession, 
-  ToolFlow, 
+import type {
+  Workspace,
+  NewWorkspace,
+  Session,
+  NewSession,
+  ToolFlow,
   NewToolFlow,
   ToolFlowStep,
-  NewToolFlowStep, 
-  FeedbackStep, 
-  NewFeedbackStep, 
-  McpServerMapping, 
-  NewMcpServerMapping 
+  NewToolFlowStep,
+  FeedbackStep,
+  NewFeedbackStep,
+  McpServerMapping,
+  NewMcpServerMapping
 } from './schema/global-schema.js';
 
 export class GlobalDatabaseService {
@@ -28,6 +28,14 @@ export class GlobalDatabaseService {
 
   constructor(dbInstance?: DrizzleDatabaseManager) {
     this.db = dbInstance || getGlobalDatabase();
+  }
+
+  /**
+   * Run a raw SQL query and return all results
+   */
+  async all(query: string): Promise<any[]> {
+    // @ts-ignore
+    return this.db.queryRaw?.(query) ?? [];
   }
 
   /**
@@ -108,15 +116,15 @@ export class GlobalDatabaseService {
    * Update workspace activity
    */
   async updateWorkspaceActivity(id: string, taskCount?: number, activeTask?: string): Promise<void> {
-    const updates: any = { 
+    const updates: any = {
       lastActivity: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    
+
     if (taskCount !== undefined) {
       updates.taskCount = taskCount;
     }
-    
+
     if (activeTask !== undefined) {
       updates.activeTask = activeTask;
     }
@@ -254,18 +262,18 @@ export class GlobalDatabaseService {
    */
   async getToolFlowByName(name: string, workspaceId?: string): Promise<ToolFlow | null> {
     const db = this.db.getDb();
-    const whereClause = workspaceId 
+    const whereClause = workspaceId
       ? and(eq(toolFlows.toolName, name), or(
-          eq(toolFlows.isGlobal, true),
-          and(eq(toolFlows.isGlobal, false), eq(toolFlows.workspaceId, workspaceId))
-        ))
+        eq(toolFlows.isGlobal, true),
+        and(eq(toolFlows.isGlobal, false), eq(toolFlows.workspaceId, workspaceId))
+      ))
       : eq(toolFlows.toolName, name);
-    
+
     const [flow] = await db.select()
       .from(toolFlows)
       .where(whereClause)
       .limit(1);
-      
+
     return flow || null;
   }
 
@@ -338,6 +346,50 @@ export class GlobalDatabaseService {
   }
 
 
+  /**
+   * Clone a global tool flow (and its steps) to a workspace
+   */
+  async cloneToolFlow(globalFlowId: string, targetWorkspaceId: string): Promise<ToolFlow | null> {
+    const db = this.db.getDb();
+    // Fetch the global tool flow
+    const globalFlow = await this.getToolFlowById(globalFlowId);
+    if (!globalFlow || !globalFlow.isGlobal) return null;
+
+    // Prepare new tool flow data
+    const now = new Date().toISOString();
+    const newFlowId = (global as any).crypto?.randomUUID?.() || require('crypto').randomUUID();
+    const { id, isGlobal, workspaceId, createdAt, updatedAt, ...rest } = globalFlow;
+    const newFlowData: NewToolFlow = {
+      id: newFlowId,
+      ...rest,
+      isGlobal: false,
+      workspaceId: targetWorkspaceId,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    // Insert the new tool flow
+    const [newFlow] = await db.insert(toolFlows).values(newFlowData).returning();
+    if (!newFlow) return null;
+
+    // Fetch steps for the original flow
+    const steps = await this.getToolFlowSteps(globalFlowId);
+
+    // Clone each step for the new flow
+    for (const step of steps) {
+      const newStepId = (global as any).crypto?.randomUUID?.() || require('crypto').randomUUID();
+      const { id, toolFlowId, createdAt, updatedAt, ...stepRest } = step;
+      await db.insert(toolFlowSteps).values({
+        id: newStepId,
+        ...stepRest,
+        toolFlowId: newFlow.id,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    return newFlow;
+  }
 
 
 
@@ -411,7 +463,7 @@ export class GlobalDatabaseService {
    */
   async getFeedbackStepByName(name: string, workspaceId?: string): Promise<FeedbackStep | null> {
     const db = this.db.getDb();
-    
+
     if (workspaceId) {
       // Check workspace-specific first
       const [workspaceResult] = await db.select()
@@ -422,18 +474,18 @@ export class GlobalDatabaseService {
           eq(feedbackSteps.workspaceId, workspaceId)
         ))
         .limit(1);
-      
+
       if (workspaceResult) {
         return workspaceResult;
       }
     }
-    
+
     // Fall back to global
     const [globalResult] = await db.select()
       .from(feedbackSteps)
       .where(and(eq(feedbackSteps.name, name), eq(feedbackSteps.isGlobal, true)))
       .limit(1);
-    
+
     return globalResult || null;
   }
 
@@ -518,13 +570,13 @@ export class GlobalDatabaseService {
    */
   async setDefaultMcpServerMapping(id: string): Promise<void> {
     const db = this.db.getDb();
-    
+
     // Get the mapping to find its interface type
     const [mapping] = await db.select()
       .from(mcpServerMappings)
       .where(eq(mcpServerMappings.id, id))
       .limit(1);
-    
+
     if (!mapping) {
       throw new Error('MCP server mapping not found');
     }
@@ -535,7 +587,7 @@ export class GlobalDatabaseService {
       await tx.update(mcpServerMappings)
         .set({ isDefault: false })
         .where(eq(mcpServerMappings.interfaceType, mapping.interfaceType));
-      
+
       // Set new default
       await tx.update(mcpServerMappings)
         .set({ isDefault: true })

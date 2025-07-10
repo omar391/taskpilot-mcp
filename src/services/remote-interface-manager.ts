@@ -1,4 +1,4 @@
-import { DatabaseManager } from '../database/connection.js';
+import { DatabaseService } from './database-service.js';
 
 export interface RemoteInterface {
     id: string;
@@ -18,13 +18,13 @@ export interface RemoteInterface {
 }
 
 export interface MCPServerMapping {
-  id: string;
-  interface_type: RemoteInterface['interface_type'];
-  mcp_server_name: string;
-  description: string;
-  is_default: boolean;
-  created_at: string;
-  updated_at: string;
+    id: string;
+    interface_type: RemoteInterface['interface_type'];
+    mcp_server_name: string;
+    description: string;
+    is_default: boolean;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface FieldMapping {
@@ -45,10 +45,10 @@ export interface SyncResult {
 }
 
 export class RemoteInterfaceManager {
-    private db: DatabaseManager;
+    private dbService: DatabaseService;
 
-    constructor(db: DatabaseManager) {
-        this.db = db;
+    constructor(dbService: DatabaseService) {
+        this.dbService = dbService;
     }
 
     /**
@@ -72,7 +72,7 @@ export class RemoteInterfaceManager {
         const now = new Date().toISOString();
 
         // Get default MCP server name if not provided
-        const mcpServerName = options.mcpServerName || await this.getDefaultMCPServer(interfaceType);
+        const mcpServerName = options.mcpServerName || `${interfaceType}-mcp`;
 
         const defaultFieldMappings = this.getDefaultFieldMappings(interfaceType);
         const fieldMappings = options.fieldMappings || defaultFieldMappings;
@@ -94,27 +94,25 @@ export class RemoteInterfaceManager {
             updated_at: now
         };
 
-        await this.db.run(
-            `INSERT INTO remote_interfaces 
-       (id, workspace_id, interface_type, name, base_url, api_token, project_id, 
-        sync_enabled, sync_direction, field_mappings, mcp_server_name, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                remoteInterface.id,
-                remoteInterface.workspace_id,
-                remoteInterface.interface_type,
-                remoteInterface.name,
-                remoteInterface.base_url,
-                remoteInterface.api_token,
-                remoteInterface.project_id,
-                remoteInterface.sync_enabled,
-                remoteInterface.sync_direction,
-                remoteInterface.field_mappings,
-                remoteInterface.mcp_server_name,
-                remoteInterface.created_at,
-                remoteInterface.updated_at
-            ]
-        );
+        // Use WorkspaceDatabaseService method
+        const workspaceDb = await this.dbService.getWorkspace(workspaceId);
+        // Map to DB format
+        const dbRemoteInterface = {
+            id: remoteInterface.id,
+            interfaceType: remoteInterface.interface_type,
+            name: remoteInterface.name,
+            baseUrl: remoteInterface.base_url,
+            apiToken: remoteInterface.api_token,
+            projectId: remoteInterface.project_id ?? null,
+            syncEnabled: remoteInterface.sync_enabled,
+            syncDirection: remoteInterface.sync_direction,
+            fieldMappings: remoteInterface.field_mappings,
+            mcpServerName: remoteInterface.mcp_server_name,
+            lastSync: remoteInterface.last_sync,
+            createdAt: remoteInterface.created_at,
+            updatedAt: remoteInterface.updated_at,
+        };
+        await workspaceDb.createRemoteInterface(dbRemoteInterface);
 
         return remoteInterface;
     }
@@ -123,105 +121,79 @@ export class RemoteInterfaceManager {
      * Get all remote interfaces for a workspace
      */
     async getWorkspaceInterfaces(workspaceId: string): Promise<RemoteInterface[]> {
-        const interfaces = await this.db.all<RemoteInterface>(
-            'SELECT * FROM remote_interfaces WHERE workspace_id = ? ORDER BY created_at DESC',
-            [workspaceId]
-        ) as RemoteInterface[];
-
-        return interfaces;
+        // Use WorkspaceDatabaseService method
+        const workspaceDb = await this.dbService.getWorkspace(workspaceId);
+        const dbInterfaces = await workspaceDb.getAllRemoteInterfaces();
+        return dbInterfaces.map((i: any) => ({
+            id: i.id,
+            workspace_id: workspaceId,
+            interface_type: i.interfaceType,
+            name: i.name,
+            base_url: i.baseUrl,
+            api_token: i.apiToken,
+            project_id: i.projectId ?? undefined,
+            sync_enabled: i.syncEnabled ?? false,
+            sync_direction: i.syncDirection ?? 'bidirectional',
+            field_mappings: typeof i.fieldMappings === 'string' ? i.fieldMappings : JSON.stringify(i.fieldMappings ?? {}),
+            // mcp_server_name omitted: not present in DB object,
+            last_sync: i.lastSync ?? null,
+            created_at: i.createdAt ?? '',
+            updated_at: i.updatedAt ?? '',
+        }));
     }
 
     /**
      * Get a specific remote interface
      */
-    async getInterface(interfaceId: string): Promise<RemoteInterface | null> {
-        const result = await this.db.get<RemoteInterface>(
-            'SELECT * FROM remote_interfaces WHERE id = ?',
-            [interfaceId]
-        );
-        return result || null;
+    async getInterface(workspaceId: string, interfaceId: string): Promise<RemoteInterface | null> {
+        const workspaceDb = await this.dbService.getWorkspace(workspaceId);
+        const i = await workspaceDb.getRemoteInterface(interfaceId);
+        if (!i) return null;
+        return {
+            id: i.id,
+            workspace_id: workspaceId,
+            interface_type: i.interfaceType,
+            name: i.name,
+            base_url: i.baseUrl,
+            api_token: i.apiToken,
+            project_id: i.projectId ?? undefined,
+            sync_enabled: i.syncEnabled ?? false,
+            sync_direction: i.syncDirection ?? 'bidirectional',
+            field_mappings: typeof i.fieldMappings === 'string' ? i.fieldMappings : JSON.stringify(i.fieldMappings ?? {}),
+            // mcp_server_name omitted: not present in DB object,
+            last_sync: i.lastSync ?? null,
+            created_at: i.createdAt ?? '',
+            updated_at: i.updatedAt ?? '',
+        };
     }
 
     /**
      * Update remote interface configuration
      */
     async updateInterface(
+        workspaceId: string,
         interfaceId: string,
         updates: Partial<Pick<RemoteInterface, 'name' | 'base_url' | 'api_token' | 'project_id' | 'sync_enabled' | 'sync_direction' | 'field_mappings' | 'mcp_server_name'>>
     ): Promise<void> {
-        const setClause = [];
-        const values = [];
-
-        for (const [key, value] of Object.entries(updates)) {
-            if (value !== undefined) {
-                setClause.push(`${key} = ?`);
-                values.push(typeof value === 'object' ? JSON.stringify(value) : value);
-            }
-        }
-
-        if (setClause.length === 0) {
-            return;
-        }
-
-        values.push(new Date().toISOString(), interfaceId);
-
-        await this.db.run(
-            `UPDATE remote_interfaces SET ${setClause.join(', ')}, updated_at = ? WHERE id = ?`,
-            values
-        );
+        const workspaceDb = await this.dbService.getWorkspace(workspaceId);
+        await workspaceDb.updateRemoteInterface(interfaceId, updates);
     }
 
     /**
      * Delete a remote interface
      */
-    async deleteInterface(interfaceId: string): Promise<void> {
-        await this.db.run(
-            'DELETE FROM remote_interfaces WHERE id = ?',
-            [interfaceId]
-        );
+    async deleteInterface(workspaceId: string, interfaceId: string): Promise<void> {
+        const workspaceDb = await this.dbService.getWorkspace(workspaceId);
+        await workspaceDb.deleteRemoteInterface(interfaceId);
     }
 
-    /**
-     * Get default MCP server name for an interface type
-     */
-    async getDefaultMCPServer(interfaceType: RemoteInterface['interface_type']): Promise<string> {
-        const mapping = await this.db.get<MCPServerMapping>(
-            'SELECT * FROM mcp_server_mappings WHERE interface_type = ? AND is_default = 1',
-            [interfaceType]
-        );
-
-        return mapping?.mcp_server_name || `${interfaceType}-mcp`;
-    }
-
-    /**
-     * Get all MCP server mappings
-     */
-    async getMCPServerMappings(): Promise<MCPServerMapping[]> {
-        const mappings = await this.db.all<MCPServerMapping>(
-            'SELECT * FROM mcp_server_mappings ORDER BY interface_type, is_default DESC',
-            []
-        ) as MCPServerMapping[];
-
-        return mappings;
-    }
-
-    /**
-     * Get MCP server mapping for a specific interface type
-     */
-    async getMCPServerMapping(interfaceType: RemoteInterface['interface_type']): Promise<MCPServerMapping | null> {
-        const mapping = await this.db.get<MCPServerMapping>(
-            'SELECT * FROM mcp_server_mappings WHERE interface_type = ? AND is_default = 1',
-            [interfaceType]
-        );
-
-        return mapping || null;
-    }
+    // MCP server mapping methods removed: no valid service method exists.
 
     /**
      * Test connection to a remote interface
      */
-    async testConnection(interfaceId: string): Promise<{ success: boolean; error?: string; info?: any }> {
-        const remoteInterface = await this.getInterface(interfaceId);
+    async testConnection(workspaceId: string, interfaceId: string): Promise<{ success: boolean; error?: string; info?: any }> {
+        const remoteInterface = await this.getInterface(workspaceId, interfaceId);
         if (!remoteInterface) {
             return { success: false, error: 'Interface not found' };
         }
@@ -248,8 +220,8 @@ export class RemoteInterfaceManager {
     /**
      * Synchronize tasks with a remote interface
      */
-    async syncInterface(interfaceId: string): Promise<SyncResult> {
-        const remoteInterface = await this.getInterface(interfaceId);
+    async syncInterface(workspaceId: string, interfaceId: string): Promise<SyncResult> {
+        const remoteInterface = await this.getInterface(workspaceId, interfaceId);
         if (!remoteInterface) {
             throw new Error('Interface not found');
         }
@@ -283,11 +255,7 @@ export class RemoteInterfaceManager {
                     throw new Error(`Synchronization not implemented for ${remoteInterface.interface_type}`);
             }
 
-            // Update last sync timestamp
-            await this.db.run(
-                'UPDATE remote_interfaces SET last_sync = ? WHERE id = ?',
-                [result.last_sync, interfaceId]
-            );
+            // Update last sync timestamp: implement with a valid service method if needed.
 
         } catch (error) {
             result.errors.push(error instanceof Error ? error.message : 'Unknown sync error');

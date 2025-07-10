@@ -112,3 +112,12 @@ export interface MCPToolResult {
   }>;
   isError?: boolean;
 }
+
+export type WorkspaceRule = {
+  id: string;
+  category: string;
+  type: string;
+  content: string;
+  confidence: number;
+  created_at: string;
+};

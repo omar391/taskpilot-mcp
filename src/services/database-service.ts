@@ -37,10 +37,10 @@ export class DatabaseService {
     // Create new workspace database service
     const workspaceDb = new WorkspaceDatabaseService(workspacePath);
     await workspaceDb.initialize();
-    
+
     // Cache it
     this.workspaceDbCache.set(workspacePath, workspaceDb);
-    
+
     return workspaceDb;
   }
 

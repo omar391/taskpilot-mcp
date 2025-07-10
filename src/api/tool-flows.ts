@@ -13,7 +13,7 @@ export class ToolFlowsController {
   constructor(
     private databaseService: DatabaseService,
     private workspacesController: WorkspacesController
-  ) {}
+  ) { }
 
   /**
    * GET /api/workspaces/{workspaceId}/tool-flows
@@ -34,10 +34,10 @@ export class ToolFlowsController {
       if (query.type === 'global' || query.type === 'all' || !query.type) {
         try {
           const globalDb = this.databaseService.getGlobal();
-          
+
           // Get all tool flows from the global database
           const globalToolFlows = await globalDb.getAllToolFlows?.() || [];
-          
+
           // Format the response to match the expected structure
           globalFlows = await Promise.all(globalToolFlows.map(async (flow: any) => {
             const toolFlow: ToolFlow = {
@@ -52,7 +52,7 @@ export class ToolFlowsController {
               updated_at: flow.updatedAt || flow.updated_at || new Date().toISOString(),
               steps: []
             };
-            
+
             // If we need to include steps, fetch them separately
             if (query.include === 'steps' && globalDb.getToolFlowSteps) {
               try {
@@ -71,7 +71,7 @@ export class ToolFlowsController {
                 toolFlow.steps = [];
               }
             }
-            
+
             return toolFlow;
           }));
         } catch (error) {
@@ -84,15 +84,15 @@ export class ToolFlowsController {
       if (query.type === 'workspace' || query.type === 'all' || !query.type) {
         try {
           const workspaceDb = await this.databaseService.getWorkspace(workspace.path);
-          
+
           // Get all tool flows from the workspace database
           const workspaceToolFlows = await (workspaceDb as any).getAllToolFlows?.() || [];
-          
+
           // Filter for flows that belong to this workspace
           const workspaceSpecificFlows = workspaceToolFlows.filter(
             (flow: any) => (flow.workspaceId || flow.workspace_id) === workspaceId
           );
-          
+
           // Format the response to match the expected structure
           workspaceFlows = await Promise.all(workspaceSpecificFlows.map(async (flow: any) => {
             const toolFlow: ToolFlow = {
@@ -107,7 +107,7 @@ export class ToolFlowsController {
               updated_at: flow.updatedAt || flow.updated_at || new Date().toISOString(),
               steps: []
             };
-            
+
             // If we need to include steps, fetch them separately
             if (query.include === 'steps' && (workspaceDb as any).getToolFlowSteps) {
               try {
@@ -126,13 +126,18 @@ export class ToolFlowsController {
                 toolFlow.steps = [];
               }
             }
-            
+
             return toolFlow;
           }));
         } catch (error) {
           console.error(`Error fetching workspace tool flows for ${workspace.path}:`, error);
           workspaceFlows = [];
         }
+
+        /**
+         * POST /api/workspaces/:workspaceId/tool-flows/:flowId/clone
+         * Clone a global tool flow (and its steps) to a workspace
+         */
       }
 
       // Get available tools from global flows
@@ -156,6 +161,79 @@ export class ToolFlowsController {
     } catch (error) {
       console.error('Error fetching tool flows:', error);
       throw error;
+    }
+  }
+
+  public async cloneToolFlow(req: Request, res: Response): Promise<void> {
+    try {
+      const { workspaceId, flowId } = req.params;
+      const globalDb: any = this.databaseService.getGlobal();
+      const workspaceDb: any = this.databaseService.getWorkspace(workspaceId);
+
+      // Fetch the global tool flow
+      const flow = await globalDb.getToolFlowById(flowId);
+      if (!flow || !flow.isGlobal) {
+        res.status(404).json({ error: 'Global tool flow not found or not global' });
+        return;
+      }
+
+      // Clone the flow to the workspace
+      const clonedFlow = await workspaceDb.cloneToolFlow(flowId, workspaceId);
+
+      res.json({ success: true, clonedFlow });
+    } catch (error) {
+      console.error('Error cloning tool flow:', error);
+      res.status(500).json({ error: 'Failed to clone tool flow' });
+    }
+  }
+
+  /**
+   * DELETE /api/workspaces/:workspaceId/tool-flows/:flowId
+   * Delete a global tool flow
+   */
+   public async deleteToolFlow(req: Request, res: Response): Promise<void> {
+    try {
+      const { flowId } = req.params;
+      const globalDb: any = this.databaseService.getGlobal();
+      const flow = await globalDb.getToolFlowById(flowId);
+      if (!flow || !flow.isGlobal) {
+        res.status(404).json({ error: 'Global tool flow not found or not global' });
+        return;
+      }
+      // ...rest of the method logic...
+    } catch (error) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  /**
+   * GET /api/workspaces/:workspaceId/tool-flows/global-feedback-steps
+   * Fetch feedback steps for all global tool flows
+   */
+  public async getGlobalToolFlowFeedbackSteps(req: Request, res: Response): Promise<void> {
+    try {
+      const globalDb: any = this.databaseService.getGlobal();
+      const globalToolFlows = await globalDb.getGlobalToolFlows();
+      const feedbackStepsByFlow: Record<string, any[]> = {};
+
+      for (const flow of globalToolFlows) {
+        if (globalDb.getToolFlowSteps) {
+          const steps = await globalDb.getToolFlowSteps(flow.id);
+          feedbackStepsByFlow[flow.id] = steps.map((step: any) => ({
+            id: step.id,
+            name: step.systemToolFn || '',
+            description: step.description || '',
+            ...step
+          }));
+        } else {
+          feedbackStepsByFlow[flow.id] = [];
+        }
+      }
+
+      res.json({ feedbackStepsByFlow });
+    } catch (error) {
+      console.error('Error fetching global tool flow feedback steps:', error);
+      res.status(500).json({ error: 'Failed to fetch global tool flow feedback steps' });
     }
   }
 }

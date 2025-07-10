@@ -31,81 +31,30 @@ export class TasksController {
       const workspace = await this.workspacesController.getWorkspaceById(workspaceId);
 
       // Build SQL query based on filters
-      let sql = `
-        SELECT 
-          id,
-          title,
-          description,
-          priority,
-          status,
-          progress,
-          parent_task_id,
-          blocked_by_task_id,
-          connected_files,
-          notes,
-          github_issue_number,
-          github_url,
-          created_at,
-          updated_at,
-          completed_at
-        FROM tasks
-      `;
-
-      const params: any[] = [];
-
-      // Add status filter
-      if (query.status === 'current') {
-        sql += ` WHERE status NOT IN ('Done', 'Dropped')`;
-      } else if (query.status === 'history') {
-        sql += ` WHERE status IN ('Done', 'Dropped')`;
-      }
-
-      // Add ordering
-      sql += ` ORDER BY 
-        CASE status 
-          WHEN 'In-Progress' THEN 1
-          WHEN 'Blocked' THEN 2
-          WHEN 'Review' THEN 3
-          WHEN 'Backlog' THEN 4
-          WHEN 'Done' THEN 5
-          WHEN 'Dropped' THEN 6
-        END,
-        CASE priority 
-          WHEN 'High' THEN 1 
-          WHEN 'Medium' THEN 2 
-          WHEN 'Low' THEN 3 
-        END,
-        updated_at DESC
-      `;
-
-      // Add pagination
       const limit = query.limit ? Math.min(query.limit, 100) : 50; // Max 100, default 50
       const offset = query.offset || 0;
-      sql += ` LIMIT ? OFFSET ?`;
-      params.push(limit, offset);
-
-      // Execute query
-      const tasks = await this.databaseService.workspaceAll<any>(workspace.path, sql, params);
-
-      // Get total count for pagination
-      let countSql = 'SELECT COUNT(*) as total FROM tasks';
-      if (query.status === 'current') {
-        countSql += ` WHERE status NOT IN ('Done', 'Dropped')`;
-      } else if (query.status === 'history') {
-        countSql += ` WHERE status IN ('Done', 'Dropped')`;
-      }
-      
-      const countResult = await this.databaseService.workspaceGet<{ total: number }>(
-        workspace.path, 
-        countSql
-      );
-      const total = countResult?.total || 0;
+      const workspaceDb = await this.databaseService.getWorkspace(workspace.path);
+      const tasks = await workspaceDb.getTasksPaginated(query.status, limit, offset);
+      const total = await workspaceDb.countTasks(query.status);
+      const transformedTasks: Task[] = tasks.map((task: any) => ({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        priority: task.priority,
+        status: task.status,
+        progress: task.progress,
+        parent_task_id: task.parent_task_id,
+        blocked_by_task_id: task.blocked_by_task_id,
+        connected_files: task.connected_files ? JSON.parse(task.connected_files) : [],
+        notes: task.notes,
+        github_issue_number: task.github_issue_number,
+        github_url: task.github_url,
+        created_at: task.created_at,
+        updated_at: task.updated_at,
+        completed_at: task.completed_at
+      }));
 
       // Transform tasks (parse connected_files JSON)
-      const transformedTasks: Task[] = tasks.map(task => ({
-        ...task,
-        connected_files: task.connected_files ? JSON.parse(task.connected_files) : []
-      }));
 
       const response: TasksResponse = {
         tasks: transformedTasks,
@@ -118,6 +67,8 @@ export class TasksController {
         page: Math.floor(offset / limit) + 1
       };
 
+
+      // Only one response object needed, already declared above.
       res.json(createSuccessResponse(response));
     } catch (error) {
       console.error('Error fetching tasks:', error);
@@ -154,54 +105,62 @@ export class TasksController {
 
       // Verify parent task exists if specified
       if (taskData.parent_task_id) {
-        const parentTask = await this.databaseService.workspaceGet(
-          workspace.path,
-          'SELECT id FROM tasks WHERE id = ?',
-          [taskData.parent_task_id]
-        );
-        
+        const workspaceDb = await this.databaseService.getWorkspace(workspace.path);
+        const parentTask = await workspaceDb.getTask(taskData.parent_task_id);
+
         if (!parentTask) {
           throw new ValidationError(`Parent task not found: ${taskData.parent_task_id}`);
         }
       }
 
       // Insert new task
-      const insertSql = `
-        INSERT INTO tasks (
-          id, title, description, priority, status, progress,
-          parent_task_id, connected_files, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
+      const workspaceDb = await this.databaseService.getWorkspace(workspace.path);
+      // Prepare DB object in snake_case
+      const dbTask = {
+        id: taskId,
+        title: taskData.title.trim(),
+        description: taskData.description.trim(),
+        priority: (taskData.priority ? taskData.priority.toLowerCase() : undefined) as 'high' | 'medium' | 'low' | null | undefined,
+        status: 'backlog' as 'backlog',
+        progress: 0,
+        parent_task_id: taskData.parent_task_id || null,
+        connected_files: '[]',
+        created_at: now,
+        updated_at: now,
+        notes: null,
+        github_issue_number: null,
+        github_url: null,
+        blocked_by_task_id: null,
+        completed_at: null,
+      };
 
-      await this.databaseService.workspaceRun(workspace.path, insertSql, [
-        taskId,
-        taskData.title.trim(),
-        taskData.description.trim(),
-        taskData.priority,
-        'Backlog',
-        0,
-        taskData.parent_task_id || null,
-        '[]', // Empty connected files array
-        now,
-        now
-      ]);
-
-      // Fetch the created task
-      const createdTask = await this.databaseService.workspaceGet(
-        workspace.path,
-        'SELECT * FROM tasks WHERE id = ?',
-        [taskId]
-      );
+      const createdTask = await workspaceDb.createTask(dbTask as any);
 
       if (!createdTask) {
         throw new Error('Failed to create task');
       }
 
-      // Transform connected_files
-      const responseTask: Task = {
-        ...createdTask,
-        connected_files: JSON.parse(createdTask.connected_files || '[]')
-      };
+      // Map DB result to camelCase for API response
+      function mapTaskDbToApi(task: any): Task {
+        return {
+          id: task.id,
+          title: task.title,
+          description: task.description ?? '',
+          priority: task.priority ?? 'medium',
+          status: task.status ?? 'backlog',
+          progress: task.progress ?? 0,
+          parent_task_id: task.parent_task_id ?? null,
+          blocked_by_task_id: task.blocked_by_task_id ?? null,
+          connected_files: task.connected_files ? JSON.parse(task.connected_files) : [],
+          notes: task.notes ?? null,
+          github_issue_number: task.github_issue_number ?? null,
+          github_url: task.github_url ?? null,
+          created_at: task.created_at ?? null,
+          updated_at: task.updated_at ?? null,
+          completed_at: task.completed_at ?? null,
+        };
+      }
+      const responseTask: Task = mapTaskDbToApi(createdTask);
 
       res.status(201).json(createSuccessResponse({ task: responseTask }));
     } catch (error) {
@@ -234,11 +193,8 @@ export class TasksController {
       const workspace = await this.workspacesController.getWorkspaceById(workspaceId);
 
       // Verify task exists
-      const existingTask = await this.databaseService.workspaceGet(
-        workspace.path,
-        'SELECT * FROM tasks WHERE id = ?',
-        [taskId]
-      );
+      const workspaceDb = await this.databaseService.getWorkspace(workspace.path);
+      const existingTask = await workspaceDb.getTask(taskId);
 
       if (!existingTask) {
         throw new NotFoundError(`Task not found: ${taskId}`);
@@ -268,26 +224,16 @@ export class TasksController {
 
       // Update task
       const now = new Date().toISOString();
-      let updateSql = `UPDATE tasks SET ${updateData.field} = ?, updated_at = ?`;
-      const params = [updateData.value, now];
-
-      // Add completed_at for Done status
+      // Reuse workspaceDb, do not redeclare
+      let updates: any = { [updateData.field]: updateData.value, updated_at: now };
       if (updateData.field === 'status' && updateData.value === 'Done') {
-        updateSql += ', completed_at = ?';
-        params.push(now);
+        updates.completed_at = now;
       }
 
-      updateSql += ' WHERE id = ?';
-      params.push(taskId);
-
-      await this.databaseService.workspaceRun(workspace.path, updateSql, params);
+      await workspaceDb.updateTask(taskId, updates);
 
       // Fetch updated task
-      const updatedTask = await this.databaseService.workspaceGet(
-        workspace.path,
-        'SELECT * FROM tasks WHERE id = ?',
-        [taskId]
-      );
+      const updatedTask = await workspaceDb.getTask(taskId);
 
       if (!updatedTask) {
         throw new Error('Failed to update task');
@@ -296,7 +242,7 @@ export class TasksController {
       res.json(createSuccessResponse({
         task: {
           id: updatedTask.id,
-          updated_at: updatedTask.updated_at,
+          updatedAt: updatedTask.updatedAt,
           [updateData.field]: updatedTask[updateData.field]
         }
       }));

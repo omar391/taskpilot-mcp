@@ -33,20 +33,8 @@ export class FeedbackStepsController {
 
       // Get global feedback steps if requested
       if (query.type === 'global' || query.type === 'all' || !query.type) {
-        const globalStepsData = await this.databaseService.globalAll(`
-          SELECT 
-            id,
-            name,
-            instructions,
-            metadata,
-            created_at,
-            updated_at
-          FROM feedback_steps 
-          WHERE workspace_id IS NULL 
-          ORDER BY name
-        `);
-
-        globalSteps = globalStepsData.map((step: any) => ({
+        const globalStepsRaw = await this.databaseService.getGlobal().getGlobalFeedbackSteps();
+        globalSteps = globalStepsRaw.map((step: any) => ({
           id: step.id,
           name: step.name,
           instructions: step.instructions,
@@ -59,60 +47,35 @@ export class FeedbackStepsController {
       // Get workspace-specific feedback steps if requested
       if (query.type === 'workspace' || query.type === 'all' || !query.type) {
         try {
-          const workspaceStepsData = await this.databaseService.workspaceAll(workspace.path, `
-            SELECT 
-              id,
-              name,
-              instructions,
-              metadata,
-              created_at,
-              updated_at
-            FROM feedback_steps 
-            WHERE workspace_id = ?
-            ORDER BY name
-          `, [workspaceId]);
+          const workspaceDb = await this.databaseService.getWorkspace(workspace.path);
+          const workspaceStepsData = await workspaceDb.getAllWorkspaceFeedbackSteps();
 
-          workspaceSteps = workspaceStepsData.map((step: any) => ({
-            id: step.id,
-            name: step.name,
-            instructions: step.instructions,
-            metadata: step.metadata ? JSON.parse(step.metadata) : {},
-            created_at: step.created_at,
-            updated_at: step.updated_at
-          }));
+          workspaceSteps = workspaceStepsData.map((step: any) => {
+            let metadataObj = {};
+            if (step.metadata) {
+              try {
+                metadataObj = JSON.parse(step.metadata);
+              } catch (e) {
+                metadataObj = {};
+              }
+            }
+            return {
+              id: step.id,
+              name: step.name,
+              instructions: step.instructions,
+              metadata: metadataObj,
+              created_at: step.created_at,
+              updated_at: step.updated_at
+            };
+          });
         } catch (error) {
           // If workspace doesn't have feedback_steps table yet, return empty array
           console.warn(`No feedback steps table in workspace ${workspace.path}:`, error);
           workspaceSteps = [];
         }
 
-        // Get workspace rules
-        try {
-          const workspaceRulesData = await this.databaseService.workspaceAll(workspace.path, `
-            SELECT 
-              id,
-              category,
-              type,
-              content,
-              confidence,
-              created_at
-            FROM workspace_rules 
-            ORDER BY created_at DESC
-          `);
-
-          workspaceRules = workspaceRulesData.map((rule: any) => ({
-            id: rule.id,
-            category: rule.category,
-            type: rule.type,
-            content: rule.content,
-            confidence: rule.confidence,
-            created_at: rule.created_at
-          }));
-        } catch (error) {
-          // If workspace doesn't have workspace_rules table yet, return empty array
-          console.warn(`No workspace rules table in workspace ${workspace.path}:`, error);
-          workspaceRules = [];
-        }
+        // Workspace rules table does not exist; set empty array
+        workspaceRules = [];
       }
 
       const response: FeedbackStepsResponse = {
