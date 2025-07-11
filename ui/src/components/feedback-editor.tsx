@@ -100,7 +100,7 @@ export function FeedbackEditor({
   }
 
   return (
-    <Card className="w-full">
+    <Card className="w-full hover:shadow-md transition-shadow duration-200">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">

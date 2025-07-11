@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { FeedbackEditor } from '@/components/feedback-editor'
 import { WorkspaceRulesDisplay } from '@/components/workspace-rules-display'
 import { PageHeader } from '@/components/page-header'
+import { SectionWithContent } from '@/components/ui/section-with-content'
 import { Plus, Globe, Building, MessageSquare } from 'lucide-react'
 import { apiClient, type FeedbackStep, type WorkspaceMetadata } from '@/lib/api-client'
 
@@ -248,43 +249,29 @@ export function FeedbackStepsPage() {
 
         {/* Global Tab */}
         <TabsContent value="global" className="space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 px-2">
-              <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                <Globe size={20} className="text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Global Feedback Steps</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Read-only templates available across all workspaces
-                </p>
-              </div>
+          <SectionWithContent
+            icon={<Globe className="h-5 w-5" />}
+            iconBgColor="bg-blue-100"
+            iconTextColor="text-blue-600"
+            title="Global Feedback Steps"
+            description="Read-only templates available across all workspaces"
+            hasContent={globalSteps.length > 0}
+            emptyStateIcon={<Globe className="h-12 w-12" />}
+            emptyStateTitle="No global feedback steps"
+            emptyStateDescription="Global feedback steps will appear here when available."
+          >
+            <div className="space-y-4">
+              {globalSteps.map((step) => (
+                <FeedbackEditor
+                  key={step.id}
+                  feedbackStep={step}
+                  isEditable={false}
+                  onClone={handleCloneStep}
+                  showVariableHelper={true}
+                />
+              ))}
             </div>
-            
-            {globalSteps.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
-                <div className="h-16 w-16 mx-auto rounded-2xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
-                  <Globe size={24} className="text-gray-500 dark:text-gray-400" />
-                </div>
-                <h3 className="font-medium mb-2 text-gray-900 dark:text-white">No global feedback steps</h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
-                  Global feedback steps will appear here when available.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {globalSteps.map((step) => (
-                  <FeedbackEditor
-                    key={step.id}
-                    feedbackStep={step}
-                    isEditable={false}
-                    onClone={handleCloneStep}
-                    showVariableHelper={true}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          </SectionWithContent>
         </TabsContent>
 
         {/* Workspace Tab */}
@@ -298,58 +285,35 @@ export function FeedbackStepsPage() {
             onToggleExpanded={() => setRulesExpanded(!rulesExpanded)}
           />
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between px-2">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
-                  <Building size={20} className="text-purple-600 dark:text-purple-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Workspace Feedback Steps</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Custom templates for this workspace
-                  </p>
-                </div>
-              </div>
+          <SectionWithContent
+            icon={<Building className="h-5 w-5" />}
+            iconBgColor="bg-purple-100"
+            iconTextColor="text-purple-600"
+            title="Workspace Feedback Steps"
+            description="Custom templates for this workspace"
+            hasContent={currentWorkspaceSteps.length > 0}
+            emptyStateIcon={<MessageSquare className="h-12 w-12" />}
+            emptyStateTitle="No custom feedback steps yet"
+            emptyStateDescription="Clone global steps to customize for your workspace needs."
+            actions={
               <button className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 shadow-md flex items-center gap-2">
                 <Plus size={16} />
                 New Step
               </button>
+            }
+          >
+            <div className="space-y-4">
+              {currentWorkspaceSteps.map((step) => (
+                <FeedbackEditor
+                  key={step.id}
+                  feedbackStep={step}
+                  isEditable={true}
+                  onSave={(updates) => handleUpdateWorkspaceStep(step.id, updates)}
+                  showVariableHelper={true}
+                />
+              ))}
             </div>
-
-            {currentWorkspaceSteps.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
-                <div className="h-16 w-16 mx-auto rounded-2xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
-                  <MessageSquare size={24} className="text-gray-500 dark:text-gray-400" />
-                </div>
-                <h3 className="font-medium mb-2 text-gray-900 dark:text-white">No custom feedback steps yet</h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
-                  Clone global steps to customize for your workspace needs.
-                </p>
-                <button 
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-all duration-200 shadow-md"
-                  onClick={() => {
-                    const globalTab = document.querySelector('[value="global"]') as HTMLButtonElement
-                    globalTab?.click()
-                  }}
-                >
-                  Browse Global Steps
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {currentWorkspaceSteps.map((step) => (
-                  <FeedbackEditor
-                    key={step.id}
-                    feedbackStep={step}
-                    isEditable={true}
-                    onSave={(updates) => handleUpdateWorkspaceStep(step.id, updates)}
-                    showVariableHelper={true}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+          </SectionWithContent>
         </TabsContent>
       </Tabs>
     </div>

@@ -39,16 +39,31 @@
   }
 
   /* Add cursor pointers to interactive elements only */
-  button, [role="button"], [role="tab"], [role="menuitem"], 
-  a, [role="link"], .cursor-pointer,
-  [data-state="active"], [data-radix-collection-item],
-  input[type="button"], input[type="submit"], input[type="reset"] {
+  button:not([disabled]), 
+  [role="button"]:not([disabled]), 
+  [role="tab"], 
+  [role="menuitem"], 
+  a, 
+  [role="link"], 
+  .cursor-pointer,
+  input[type="button"]:not([disabled]), 
+  input[type="submit"]:not([disabled]), 
+  input[type="reset"]:not([disabled]),
+  select,
+  [data-state="active"][role="tab"],
+  [data-radix-collection-item][role="menuitem"] {
     cursor: pointer;
   }
   
   /* Remove cursor pointer from cards by default */
-  .modern-card {
+  .modern-card,
+  .bg-card {
     cursor: default;
+  }
+  
+  /* Only show pointer cursor on explicitly clickable cards */
+  .cursor-pointer {
+    cursor: pointer !important;
   }
 
   .dark {

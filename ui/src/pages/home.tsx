@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card'
 import { Link } from '@tanstack/react-router'
-import { Folder } from 'lucide-react'
+import { SectionWithContent } from '@/components/ui/section-with-content'
+import { Folder, Zap, Moon } from 'lucide-react'
 import { tailwindClasses, designSystem } from '@/lib/design-system'
 import { apiClient, type WorkspaceMetadata } from '@/lib/api-client'
 import { GettingStarted } from '@/components/getting-started'
@@ -77,7 +79,7 @@ export function HomePage() {
 
       {/* Loading State */}
       {loading && (
-        <div className={`${tailwindClasses.card.base} ${tailwindClasses.card.hover}`}>
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
           <div className="text-center py-12">
             <div 
               className="h-12 w-12 mx-auto rounded-full border-4 border-gray-200 border-t-blue-500 animate-spin mb-4"
@@ -89,7 +91,7 @@ export function HomePage() {
 
       {/* Error State */}
       {error && (
-        <div className={`${tailwindClasses.card.base}`} style={{ borderColor: designSystem.colors.accent.orange }}>
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-sm" style={{ borderColor: designSystem.colors.accent.orange }}>
           <div className="text-center py-12">
             <div 
               className="h-12 w-12 mx-auto rounded-full flex items-center justify-center mb-4"
@@ -128,272 +130,138 @@ export function HomePage() {
 
           {/* Show Active Workspaces first if any exist */}
       {activeWorkspaces.length > 0 && (
-        <div className={`${tailwindClasses.card.base} ${tailwindClasses.card.hover}`}>
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div 
-                  className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl flex items-center justify-center shadow-lg shrink-0"
-                  style={{ 
-                    background: `linear-gradient(135deg, ${designSystem.colors.accent.green}, ${designSystem.colors.accent.green}dd)` 
-                  }}
-                >
-                  <span className="text-xl sm:text-2xl">⚡</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h2 
-                    className={`${tailwindClasses.typography.title} text-xl sm:text-2xl`}
-                    style={{ 
-                      background: `linear-gradient(to right, ${designSystem.colors.accent.green}, ${designSystem.colors.accent.green}dd)`,
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent',
-                      fontWeight: '700'
-                    }}
-                  >
-                    Active Workspaces
-                  </h2>
-                  <p className={`${tailwindClasses.typography.subtitle} text-sm sm:text-base`}>
-                    {activeWorkspaces.length} workspace{activeWorkspaces.length !== 1 ? 's' : ''} connected
-                  </p>
-                </div>
-              </div>
-              
-              {/* Status Overview - responsive */}
-              <div className="flex items-center justify-between sm:justify-end gap-4">
-                <span className="text-sm text-gray-500 sm:hidden">Total Tasks:</span>
-                <div className="text-right shrink-0">
-                  <div 
-                    className="text-2xl sm:text-3xl font-bold"
-                    style={{ color: designSystem.colors.accent.green }}
-                  >
-                    {totalTasks}
-                  </div>
-                  <div className={`${tailwindClasses.typography.caption} uppercase tracking-wide hidden sm:block`}>
-                    Total Tasks
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Active Workspace List */}
-            <div className="space-y-4">
-              {activeWorkspaces.map((workspace) => (
-                <Link
-                  key={workspace.id}
-                  to="/workspace/$workspaceId/tasks"
-                  params={{ workspaceId: workspace.id }}
-                  className={`${tailwindClasses.listItem.base} ${tailwindClasses.listItem.hover} block cursor-pointer`}
-                >
-                  <div 
-                    className="w-1 h-full rounded-sm mr-3 md:mr-4"
-                    style={{ backgroundColor: designSystem.colors.accent.green }}
-                  />
-                  
-                  {/* Responsive layout container */}
-                  <div className="flex-1 space-y-3">
-                    {/* Header row - responsive */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div 
-                          className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ backgroundColor: `${designSystem.colors.accent.green}20` }}
-                        >
-                          <Folder size={18} style={{ color: designSystem.colors.accent.green }} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 
-                            className={`${tailwindClasses.typography.title} truncate`}
-                            style={{ color: designSystem.colors.neutral[900] }}
-                          >
-                            {workspace.name}
-                          </h3>
-                          {/* Path - responsive with better breaking */}
-                          <div className="flex items-center gap-2 mt-1">
-                            <p 
-                              className={`${tailwindClasses.typography.caption} font-mono break-all sm:break-normal sm:truncate`}
-                              style={{ color: designSystem.colors.neutral[600] }}
-                              title={workspace.path}
-                            >
-                              {workspace.path}
-                            </p>
-                          </div>
-                        </div>
+        <SectionWithContent
+          icon={<Zap className="h-5 w-5" />}
+          iconBgColor="bg-green-100"
+          iconTextColor="text-green-600"
+          title="Active Workspaces"
+          description={`${activeWorkspaces.length} workspace${activeWorkspaces.length !== 1 ? 's' : ''} connected • ${totalTasks} total tasks`}
+          hasContent={true}
+        >
+          <div className="space-y-4">
+            {activeWorkspaces.map((workspace) => (
+              <Link
+                key={workspace.id}
+                to="/workspace/$workspaceId/tasks"
+                params={{ workspaceId: workspace.id }}
+                className="block group"
+              >
+                <Card className="border-l-4 border-l-green-500 transition-all duration-200 group-hover:shadow-lg group-hover:bg-accent/5 cursor-pointer">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-lg bg-green-100 flex items-center justify-center shrink-0 transition-colors group-hover:bg-green-200">
+                        <Folder size={20} className="text-green-600" />
                       </div>
                       
-                      {/* Task count - responsive positioning */}
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-xl truncate text-gray-900 mb-1">
+                          {workspace.name}
+                        </CardTitle>
+                        <CardDescription className="font-mono text-sm truncate" title={workspace.path}>
+                          {workspace.path}
+                        </CardDescription>
+                      </div>
+                      
                       {workspace.task_count && (
-                        <div className="flex items-center justify-between sm:justify-end gap-2">
-                          <span className="text-sm text-gray-500 sm:hidden">Tasks:</span>
-                          <div className="text-right shrink-0">
-                            <div 
-                              className="text-lg font-bold"
-                              style={{ color: designSystem.colors.accent.green }}
-                            >
-                              {workspace.task_count}
-                            </div>
-                            <div 
-                              className={`${tailwindClasses.typography.caption} hidden sm:block`}
-                              style={{ color: designSystem.colors.accent.green }}
-                            >
-                              tasks
-                            </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-2xl font-bold text-green-600">
+                            {workspace.task_count}
+                          </div>
+                          <div className="text-xs text-green-600 uppercase tracking-wide">
+                            tasks
                           </div>
                         </div>
                       )}
                     </div>
                     
-                    {/* Active task block - always full width */}
                     {workspace.active_task && (
-                      <div 
-                        className="p-3 rounded-lg border"
-                        style={{ 
-                          backgroundColor: designSystem.colors.neutral[50],
-                          borderColor: `${designSystem.colors.accent.green}30`
-                        }}
-                      >
+                      <div className="mt-4 p-3 rounded-lg border bg-green-50 border-green-200">
                         <div className="flex items-center gap-2 mb-2">
-                          <div 
-                            className="h-1.5 w-1.5 rounded-full animate-pulse shrink-0"
-                            style={{ backgroundColor: designSystem.colors.accent.green }}
-                          />
-                          <span 
-                            className={`${tailwindClasses.typography.caption} font-medium uppercase tracking-wide`}
-                            style={{ color: designSystem.colors.accent.green }}
-                          >
+                          <div className="h-2 w-2 rounded-full animate-pulse bg-green-600" />
+                          <span className="text-xs font-medium uppercase tracking-wide text-green-600">
                             ACTIVE TASK
                           </span>
                         </div>
-                        <p 
-                          className={`${tailwindClasses.typography.subtitle} font-medium break-words`}
-                          style={{ color: designSystem.colors.neutral[900] }}
-                        >
+                        <p className="text-sm font-medium text-gray-900">
                           {workspace.active_task}
                         </p>
                       </div>
                     )}
-                  </div>
-                </Link>
+                  </CardContent>
+                </Card>
+              </Link>
               ))}
             </div>
-          </div>
-        </div>
+          </SectionWithContent>
       )}
 
       {/* Available Workspaces - only show if there are inactive workspaces */}
       {inactiveWorkspaces.length > 0 && (
-        <div className={`${tailwindClasses.card.base} ${tailwindClasses.card.hover}`}>
-          <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <div 
-                className="h-12 w-12 sm:h-14 sm:w-14 rounded-2xl flex items-center justify-center shadow-lg shrink-0"
-                style={{ 
-                  background: `linear-gradient(135deg, ${designSystem.colors.neutral[500]}, ${designSystem.colors.neutral[600]})` 
-                }}
-              >
-                <span className="text-xl sm:text-2xl">💤</span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <h2 
-                  className={`${tailwindClasses.typography.title} text-xl sm:text-2xl`}
-                  style={{ 
-                    background: `linear-gradient(to right, ${designSystem.colors.neutral[500]}, ${designSystem.colors.neutral[600]})`,
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    fontWeight: '700'
-                  }}
-                >
-                  Available Workspaces
-                </h2>
-                <p className={`${tailwindClasses.typography.subtitle} text-sm sm:text-base`}>
-                  {inactiveWorkspaces.length} workspace{inactiveWorkspaces.length !== 1 ? 's' : ''} ready to connect
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {inactiveWorkspaces.map((workspace) => (
+        <SectionWithContent
+          icon={<Moon className="h-5 w-5" />}
+          iconBgColor="bg-gray-100"
+          iconTextColor="text-gray-600"
+          title="Available Workspaces"
+          description={`${inactiveWorkspaces.length} workspace${inactiveWorkspaces.length !== 1 ? 's' : ''} ready to connect`}
+          hasContent={true}
+        >
+          <div className="space-y-4">
+            {inactiveWorkspaces.map((workspace) => (
                 <Link
                   key={workspace.id}
                   to="/workspace/$workspaceId/tasks"
                   params={{ workspaceId: workspace.id }}
-                  className={`${tailwindClasses.listItem.base} ${tailwindClasses.listItem.hover} block cursor-pointer`}
+                  className="block group"
                 >
-                  <div 
-                    className="w-1 h-full rounded-sm mr-3 md:mr-4"
-                    style={{ backgroundColor: designSystem.colors.neutral[300] }}
-                  />
-                  
-                  {/* Responsive layout for inactive workspaces */}
-                  <div className="flex-1">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div 
-                          className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ backgroundColor: designSystem.colors.neutral[100] }}
-                        >
-                          <Folder size={18} style={{ color: designSystem.colors.neutral[600] }} />
+                  <Card className="border-l-4 border-l-gray-300 transition-all duration-200 group-hover:shadow-lg group-hover:bg-accent/5 cursor-pointer">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-4">
+                        <div className="h-12 w-12 rounded-lg bg-gray-100 flex items-center justify-center shrink-0 transition-colors group-hover:bg-gray-200">
+                          <Folder size={20} className="text-gray-600" />
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 
-                            className={`${tailwindClasses.typography.title} truncate`}
-                            style={{ color: designSystem.colors.neutral[900] }}
-                          >
+                        
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-xl truncate text-gray-900 mb-1">
                             {workspace.name}
-                          </h3>
-                          <p 
-                            className={`${tailwindClasses.typography.caption} font-mono break-all sm:break-normal sm:truncate`}
-                            style={{ color: designSystem.colors.neutral[600] }}
-                            title={workspace.path}
-                          >
+                          </CardTitle>
+                          <CardDescription className="font-mono text-sm truncate" title={workspace.path}>
                             {workspace.path}
-                          </p>
+                          </CardDescription>
                           {workspace.last_activity && (
-                            <p 
-                              className={`${tailwindClasses.typography.caption} mt-1`}
-                              style={{ color: designSystem.colors.neutral[500] }}
-                            >
+                            <CardDescription className="text-xs mt-1">
                               Last active: {formatLastActivity(workspace.last_activity)}
-                            </p>
+                            </CardDescription>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-3 shrink-0">
+                          {workspace.status === 'error' && (
+                            <div className="flex items-center gap-2">
+                              <span className="h-2 w-2 rounded-full bg-orange-500" />
+                              <span className="text-xs text-orange-500 font-medium">
+                                Error
+                              </span>
+                            </div>
+                          )}
+                          
+                          {workspace.task_count && (
+                            <div className="text-right">
+                              <div className="text-lg font-bold text-gray-600">
+                                {workspace.task_count}
+                              </div>
+                              <div className="text-xs text-gray-600 uppercase tracking-wide">
+                                tasks
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
-                      
-                      {/* Status and task info - responsive */}
-                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-                        {workspace.status === 'error' && (
-                          <div className="flex items-center gap-1">
-                            <span 
-                              className="h-2 w-2 rounded-full"
-                              style={{ backgroundColor: designSystem.colors.accent.orange }}
-                            />
-                            <span 
-                              className={tailwindClasses.typography.caption}
-                              style={{ color: designSystem.colors.accent.orange }}
-                            >
-                              Error
-                            </span>
-                          </div>
-                        )}
-                        
-                        {workspace.task_count && (
-                          <div className="flex items-center gap-2 sm:flex-col sm:items-end sm:gap-0">
-                            <span className="text-sm text-gray-500 sm:hidden">Tasks:</span>
-                            <div 
-                              className={`${tailwindClasses.typography.subtitle} font-medium`}
-                              style={{ color: designSystem.colors.neutral[600] }}
-                            >
-                              {workspace.task_count} tasks
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 </Link>
               ))}
             </div>
-          </div>
-        </div>
+          </SectionWithContent>
       )}
         </>
       )}

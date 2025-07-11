@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Copy, Edit, Settings } from 'lucide-react';
 import type { FeedbackStep } from '@/lib/api-client';
@@ -84,8 +85,8 @@ export function ToolFlowCard({
   };
 
   return (
-    <div className="modern-card hover:shadow-md transition-shadow duration-200">
-      <div className="p-6 space-y-4">
+    <Card className="hover:shadow-md transition-shadow duration-200">
+      <CardContent className="p-6 space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
@@ -129,9 +130,9 @@ export function ToolFlowCard({
             )}
           </div>
         </div>
-      </div>
 
-      <div className="space-y-4">
+        {/* Second section - Workflow visualization */}
+        <div className="space-y-4">
         {/* Workflow visualization */}
         <div className="flex items-center justify-center p-3 bg-muted/20 rounded-lg">
           <div className="flex items-center gap-2">
@@ -213,7 +214,8 @@ export function ToolFlowCard({
             </Button>
           </div>
         )}
-      </div>
-    </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

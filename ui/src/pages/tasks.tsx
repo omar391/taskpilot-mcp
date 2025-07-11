@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Card, CardContent } from '@/components/ui/card'
 import { PageHeader } from '@/components/page-header'
 import { CheckCircle, Clock, AlertCircle, Calendar, CheckSquare } from 'lucide-react'
 import { TaskCreationDialog } from '@/components/task-creation-dialog'
+import { SectionWithContent } from '@/components/ui/section-with-content'
 import { apiClient, type Task, type WorkspaceMetadata } from '@/lib/api-client'
 
 export function TasksPage() {
@@ -94,16 +96,16 @@ export function TasksPage() {
         </div>
         
         {/* Content Skeleton */}
-        <div className="modern-card">
-          <div className="p-6 space-y-4">
+        <Card>
+          <CardContent className="p-6 space-y-4">
             <div className="h-6 w-40 bg-muted animate-pulse rounded" />
             <div className="space-y-3">
               {[1, 2, 3].map(i => (
                 <div key={i} className="h-24 bg-muted animate-pulse rounded-lg" />
               ))}
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -127,8 +129,8 @@ export function TasksPage() {
           </div>
         </div>
 
-        <div className="modern-card">
-          <div className="p-6 text-center">
+        <Card>
+          <CardContent className="p-6 text-center">
             <div className="h-16 w-16 mx-auto rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-4">
               <AlertCircle size={24} className="text-red-600 dark:text-red-400" />
             </div>
@@ -140,8 +142,8 @@ export function TasksPage() {
             >
               Try Again
             </button>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -187,8 +189,8 @@ export function TasksPage() {
   }
 
   const TaskCard = ({ task }: { task: Task }) => (
-    <div className="modern-card hover:shadow-md transition-shadow duration-200">
-      <div className="p-6 space-y-4">
+    <Card className="hover:shadow-lg transition-shadow duration-200">
+      <CardContent className="p-6 space-y-4">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -246,8 +248,8 @@ export function TasksPage() {
             </span>
           </div>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 
   return (
@@ -307,93 +309,67 @@ export function TasksPage() {
 
         {/* Current Tasks Tab */}
         <TabsContent value="current" className="space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 px-2">
-              <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                <Clock size={20} className="text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Active Tasks</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Tasks currently in progress or pending
-                </p>
-              </div>
+          <SectionWithContent
+            icon={<Clock size={20} />}
+            title="Active Tasks"
+            description="Tasks currently in progress or pending"
+            iconBgColor="bg-blue-100 dark:bg-blue-900"
+            iconTextColor="text-blue-600 dark:text-blue-400"
+            hasContent={currentTasks.length > 0}
+            emptyStateIcon={<Calendar size={24} />}
+            emptyStateTitle="No active tasks"
+            emptyStateDescription="Create your first task to get started with this workspace."
+            emptyStateActions={
+              <TaskCreationDialog
+                buttonText="Create Task"
+                buttonVariant="default"
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-all duration-200 shadow-lg"
+                onTaskCreated={async (newTask) => {
+                  setIsCreatingTask(true)
+                  try {
+                    // TODO: Replace with actual API call when available
+                    console.log('Creating task:', newTask)
+                    // Simulate API call
+                    await new Promise(resolve => setTimeout(resolve, 1000))
+                    // Refresh tasks after creation
+                    window.location.reload()
+                  } catch (error) {
+                    console.error('Failed to create task:', error)
+                    setError('Failed to create task. Please try again.')
+                  } finally {
+                    setIsCreatingTask(false)
+                  }
+                }}
+              />
+            }
+          >
+            <div className="space-y-4">
+              {currentTasks.map((task) => (
+                <TaskCard key={task.id} task={task} />
+              ))}
             </div>
-            
-            {currentTasks.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
-                <div className="h-16 w-16 mx-auto rounded-2xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
-                  <Calendar size={24} className="text-gray-500 dark:text-gray-400" />
-                </div>
-                <h3 className="font-medium mb-2 text-gray-900 dark:text-white">No active tasks</h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
-                  Create your first task to get started with this workspace.
-                </p>
-                <TaskCreationDialog
-                  buttonText="Create Task"
-                  buttonVariant="default"
-                  className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-all duration-200 shadow-lg"
-                  onTaskCreated={async (newTask) => {
-                    setIsCreatingTask(true)
-                    try {
-                      // TODO: Replace with actual API call when available
-                      console.log('Creating task:', newTask)
-                      // Simulate API call
-                      await new Promise(resolve => setTimeout(resolve, 1000))
-                      // Refresh tasks after creation
-                      window.location.reload()
-                    } catch (error) {
-                      console.error('Failed to create task:', error)
-                      setError('Failed to create task. Please try again.')
-                    } finally {
-                      setIsCreatingTask(false)
-                    }
-                  }}
-                />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {currentTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} />
-                ))}
-              </div>
-            )}
-          </div>
+          </SectionWithContent>
         </TabsContent>
 
         {/* History Tasks Tab */}
         <TabsContent value="history" className="space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 px-2">
-              <div className="h-10 w-10 rounded-xl bg-green-100 dark:bg-green-900 flex items-center justify-center">
-                <CheckCircle size={20} className="text-green-600 dark:text-green-400" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg text-gray-900 dark:text-white">Completed Tasks</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Tasks that have been finished or dropped
-                </p>
-              </div>
+          <SectionWithContent
+            icon={<CheckCircle size={20} />}
+            title="Completed Tasks"
+            description="Tasks that have been finished or dropped"
+            iconBgColor="bg-green-100 dark:bg-green-900"
+            iconTextColor="text-green-600 dark:text-green-400"
+            hasContent={historyTasks.length > 0}
+            emptyStateIcon={<CheckCircle size={24} />}
+            emptyStateTitle="No completed tasks yet"
+            emptyStateDescription="Completed tasks will appear here for reference and tracking."
+          >
+            <div className="space-y-4">
+              {historyTasks.map((task) => (
+                <TaskCard key={task.id} task={task} />
+              ))}
             </div>
-            
-            {historyTasks.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
-                <div className="h-16 w-16 mx-auto rounded-2xl bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
-                  <CheckCircle size={24} className="text-gray-500 dark:text-gray-400" />
-                </div>
-                <h3 className="font-medium mb-2 text-gray-900 dark:text-white">No completed tasks yet</h3>
-                <p className="text-gray-600 dark:text-gray-400 text-sm">
-                  Completed tasks will appear here for reference and tracking.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {historyTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} />
-                ))}
-              </div>
-            )}
-          </div>
+          </SectionWithContent>
         </TabsContent>
       </Tabs>
     </div>

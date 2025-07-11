@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToolFlowCard } from '@/components/tool-flow-card'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/page-header'
+import { SectionWithContent } from '@/components/ui/section-with-content'
 import { Globe, Building, AlertCircle, RefreshCw, Settings, Plus } from 'lucide-react'
 import { apiClient, type ToolFlow, type FeedbackStep, type WorkspaceMetadata } from '@/lib/api-client'
 import { tailwindClasses } from '@/lib/design-system'
@@ -369,105 +370,75 @@ export function ToolFlowsPage() {
         </TabsList>
           
         <TabsContent value="global" className="space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 px-2">
-              <div className="h-10 w-10 rounded-xl bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                <Globe size={20} className="text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Global Tool Flows
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Predefined flows available across all workspaces
-                </p>
-              </div>
+          <SectionWithContent
+            icon={<Globe className="h-5 w-5" />}
+            iconBgColor="bg-blue-100"
+            iconTextColor="text-blue-600"
+            title="Global Tool Flows"
+            description="Predefined flows available across all workspaces"
+            hasContent={globalFlows.length > 0}
+            emptyStateIcon={<Globe className="h-12 w-12" />}
+            emptyStateTitle="No global tool flows"
+            emptyStateDescription="Global tool flows will appear here when available."
+          >
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {globalFlows.map((flow) => {
+                const flowFeedbackStep = getFeedbackStepForFlow(flow);
+                return (
+                  <ToolFlowCard
+                    key={flow.id}
+                    flow={flow}
+                    feedbackSteps={flowFeedbackStep ? [flowFeedbackStep] : []}
+                    availableTools={availableTools}
+                    isEditable={!flow.is_global}
+                    onEdit={handleEditFlow}
+                    onClone={handleCloneFlow}
+                    onUpdate={handleUpdateFlow}
+                    onDelete={handleDeleteFlow}
+                  />
+                );
+              })}
             </div>
-          
-            {globalFlows.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
-                <div className="rounded-full bg-gray-100 dark:bg-gray-700 p-4 mb-6 border border-gray-200 dark:border-gray-600 shadow-sm">
-                  <Globe className="h-8 w-8 text-gray-600 dark:text-gray-400" />
-                </div>
-                <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Global Flows</h4>
-                <p className="text-gray-600 dark:text-gray-400 text-center max-w-md mb-6">
-                  There are no global tool flows available at the moment
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {globalFlows.map((flow) => {
-                  const flowFeedbackStep = getFeedbackStepForFlow(flow);
-                  return (
-                    <ToolFlowCard
-                      key={flow.id}
-                      flow={flow}
-                      feedbackSteps={flowFeedbackStep ? [flowFeedbackStep] : []}
-                      availableTools={availableTools}
-                      isEditable={!flow.is_global}
-                      onEdit={handleEditFlow}
-                      onClone={handleCloneFlow}
-                      onUpdate={handleUpdateFlow}
-                      onDelete={handleDeleteFlow}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          </SectionWithContent>
         </TabsContent>
         
         <TabsContent value="workspace" className="space-y-6">
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 px-2">
-              <div className="h-10 w-10 rounded-xl bg-purple-100 dark:bg-purple-900 flex items-center justify-center">
-                <Building size={20} className="text-purple-600 dark:text-purple-400" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                  Workspace Tool Flows
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Create and manage flows specific to this workspace
-                </p>
-              </div>
+          <SectionWithContent
+            icon={<Building className="h-5 w-5" />}
+            iconBgColor="bg-purple-100"
+            iconTextColor="text-purple-600"
+            title="Workspace Tool Flows"
+            description="Create and manage flows specific to this workspace"
+            hasContent={workspaceFlows.length > 0}
+            emptyStateIcon={<Building className="h-12 w-12" />}
+            emptyStateTitle="No workspace tool flows yet"
+            emptyStateDescription="Create your first workspace tool flow to get started."
+            actions={
+              <button className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-all duration-200 shadow-lg flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Create Flow
+              </button>
+            }
+          >
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {workspaceFlows.map((flow) => {
+                const flowFeedbackStep = getFeedbackStepForFlow(flow);
+                return (
+                  <ToolFlowCard
+                    key={flow.id}
+                    flow={flow}
+                    feedbackSteps={flowFeedbackStep ? [flowFeedbackStep] : []}
+                    availableTools={availableTools}
+                    isEditable={!flow.is_global}
+                    onEdit={handleEditFlow}
+                    onClone={handleCloneFlow}
+                    onUpdate={handleUpdateFlow}
+                    onDelete={handleDeleteFlow}
+                  />
+                );
+              })}
             </div>
-            
-            {workspaceFlows.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
-                <div className="rounded-full bg-gray-100 dark:bg-gray-700 p-4 mb-6 border border-gray-200 dark:border-gray-600 shadow-sm">
-                  <Building className="h-8 w-8 text-gray-600 dark:text-gray-400" />
-                </div>
-                <h4 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Workspace Flows</h4>
-                <p className="text-gray-600 dark:text-gray-400 text-center max-w-md mb-6">
-                  Get started by creating your first workspace tool flow
-                </p>
-                <button className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-all duration-200 shadow-lg flex items-center gap-2">
-                  <Plus className="h-4 w-4" />
-                  Create Flow
-                </button>
-              </div>
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {workspaceFlows.map((flow) => {
-                  const flowFeedbackStep = getFeedbackStepForFlow(flow);
-                  return (
-                    <ToolFlowCard
-                      key={flow.id}
-                      flow={flow}
-                      feedbackSteps={flowFeedbackStep ? [flowFeedbackStep] : []}
-                      availableTools={availableTools}
-                      isEditable={!flow.is_global}
-                      onEdit={handleEditFlow}
-                      onClone={handleCloneFlow}
-                      onUpdate={handleUpdateFlow}
-                      onDelete={handleDeleteFlow}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          </SectionWithContent>
         </TabsContent>
       </Tabs>
     </div>
