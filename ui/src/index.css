@@ -38,6 +38,19 @@
     --surface-gradient: linear-gradient(135deg, hsl(var(--gradient-from)) 0%, hsl(var(--gradient-to)) 100%);
   }
 
+  /* Add cursor pointers to interactive elements only */
+  button, [role="button"], [role="tab"], [role="menuitem"], 
+  a, [role="link"], .cursor-pointer,
+  [data-state="active"], [data-radix-collection-item],
+  input[type="button"], input[type="submit"], input[type="reset"] {
+    cursor: pointer;
+  }
+  
+  /* Remove cursor pointer from cards by default */
+  .modern-card {
+    cursor: default;
+  }
+
   .dark {
     --background: 224 71.4% 4.1%;
     --foreground: 210 20% 98%;

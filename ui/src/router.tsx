@@ -9,29 +9,29 @@ import { FloatingNav } from './components/floating-nav'
 const rootRoute = createRootRoute({
   component: () => (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-8">
-          {/* Header */}
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">TaskPilot</h1>
-            <p className="text-gray-600">Model Context Protocol Task Manager</p>
-          </div>
-          
-          {/* Content */}
-          <div id="router-outlet">
-            <Outlet />
-          </div>
-        </div>
-      </div>
+      <Outlet />
     </div>
   ),
 })
 
-// Home route
+// Home route (keeps the original header styling)
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: HomePage,
+  component: () => (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">TaskPilot</h1>
+          <p className="text-gray-600">Model Context Protocol Task Manager</p>
+        </div>
+        
+        {/* Content */}
+        <HomePage />
+      </div>
+    </div>
+  ),
 })
 
 // Workspace routes

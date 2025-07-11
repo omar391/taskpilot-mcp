@@ -251,7 +251,11 @@ export class TaskPilotApiClient {
   // Feedback Steps API
   // ========================================
 
-  async getFeedbackSteps(workspaceId: string): Promise<ApiResponse<{ feedbackSteps: FeedbackStep[] }>> {
+  async getFeedbackSteps(workspaceId: string): Promise<ApiResponse<{ 
+    feedbackSteps: FeedbackStep[];
+    global_steps?: FeedbackStep[];
+    workspace_steps?: FeedbackStep[];
+  }>> {
     const response = await this.makeRequest<{
       global_steps: Array<{
         id: string;
