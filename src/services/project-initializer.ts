@@ -153,6 +153,21 @@ export class ProjectInitializer {
    * Create initial project tasks based on requirements and tech stack
    */
   private async createInitialTasks(workspaceId: string, requirements: string, techStack: string): Promise<Task[]> {
+    // CRITICAL FIX: Get workspace from global DB to get the workspace path
+    const globalDb = getGlobalDatabase();
+    const workspace = await globalDb.getDb().select()
+      .from(workspaces)
+      .where(eq(workspaces.id, workspaceId))
+      .get();
+
+    if (!workspace) {
+      throw new Error(`Workspace with ID ${workspaceId} not found`);
+    }
+
+    // Import and initialize the workspace database service for the correct workspace
+    const { getWorkspaceDatabase, initializeWorkspaceDatabase } = await import('../database/drizzle-connection.js');
+    const workspaceDb = await initializeWorkspaceDatabase(workspace.path);
+
     const initialTasks: Partial<DatabaseTask>[] = [
       {
         id: this.generateTaskId(),
@@ -218,7 +233,7 @@ export class ProjectInitializer {
       });
     }
 
-    // Insert tasks into database using Drizzle
+    // Insert tasks into WORKSPACE database using correct Drizzle connection
     const createdTasks: Task[] = [];
     for (const task of initialTasks) {
       const taskData: NewTask = {
@@ -228,15 +243,18 @@ export class ProjectInitializer {
         priority: (task.priority as 'High' | 'Medium' | 'Low')?.toLowerCase() as 'high' | 'medium' | 'low' || 'medium',
         status: (task.status as 'Backlog' | 'In-Progress' | 'Blocked' | 'Review' | 'Done' | 'Dropped')?.toLowerCase().replace('-', '-') as 'backlog' | 'in-progress' | 'blocked' | 'review' | 'done' | 'dropped' || 'backlog',
         progress: task.progress || 0,
-        dependencies: [],
+        dependencies: JSON.stringify([]),
         notes: task.notes,
-        connectedFiles: task.connected_files ? JSON.parse(task.connected_files) : []
+        connectedFiles: JSON.stringify(task.connected_files ? JSON.parse(task.connected_files) : []),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        completedAt: null
       };
 
-      await this.drizzleManager.getDb().insert(tasks).values(taskData);
+      await workspaceDb.getDb().insert(tasks).values(taskData);
 
-      // Fetch the created task
-      const dbTask = await this.drizzleManager.getDb().select()
+      // Fetch the created task from workspace database
+      const dbTask = await workspaceDb.getDb().select()
         .from(tasks)
         .where(eq(tasks.id, task.id!))
         .get();
@@ -273,6 +291,21 @@ export class ProjectInitializer {
    */
   private async createWorkspaceRules(workspaceId: string, techStack: string): Promise<boolean> {
     try {
+      // Get workspace from global DB to get the workspace path
+      const globalDb = getGlobalDatabase();
+      const workspace = await globalDb.getDb().select()
+        .from(workspaces)
+        .where(eq(workspaces.id, workspaceId))
+        .get();
+
+      if (!workspace) {
+        throw new Error(`Workspace with ID ${workspaceId} not found`);
+      }
+
+      // Use correct workspace database for feedback steps
+      const { initializeWorkspaceDatabase } = await import('../database/drizzle-connection.js');
+      const workspaceDb = await initializeWorkspaceDatabase(workspace.path);
+
       // Generate tech-stack specific rules
       let workspaceRulesInstructions = `# Workspace-Specific Development Rules
 
@@ -336,20 +369,22 @@ export class ProjectInitializer {
 
 *These rules evolve based on project needs and team feedback.*`;
 
-      // Create workspace_rules feedback step using Drizzle
+      // Create workspace_rules feedback step using workspace Drizzle connection
       const feedbackStepData: NewWorkspaceFeedbackStep = {
         id: uuidv4(),
         name: 'workspace_rules',
         description: 'Workspace-specific development rules and guidelines',
         templateContent: workspaceRulesInstructions,
-        variableSchema: {
+        variableSchema: JSON.stringify({
           category: 'workspace_guidelines',
           tech_stack: techStack,
           auto_generated: true
-        }
+        }),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
 
-      await this.drizzleManager.getDb().insert(workspaceFeedbackSteps).values(feedbackStepData);
+      await workspaceDb.getDb().insert(workspaceFeedbackSteps).values(feedbackStepData);
 
       return true;
     } catch (error) {
@@ -410,11 +445,14 @@ export class ProjectInitializer {
     }
 
     // Check if workspace has tasks and rules using workspace database
-    const taskCountResult = await this.drizzleManager.getDb().select({ count: sql<number>`COUNT(*)` })
+    const { initializeWorkspaceDatabase } = await import('../database/drizzle-connection.js');
+    const workspaceDb = await initializeWorkspaceDatabase(workspace.path);
+
+    const taskCountResult = await workspaceDb.getDb().select({ count: sql<number>`COUNT(*)` })
       .from(tasks)
       .get();
 
-    const workspaceRules = await this.drizzleManager.getDb().select()
+    const workspaceRules = await workspaceDb.getDb().select()
       .from(workspaceFeedbackSteps)
       .where(eq(workspaceFeedbackSteps.name, 'workspace_rules'))
       .get();
@@ -437,10 +475,14 @@ export class ProjectInitializer {
       throw new Error(`Workspace not found: ${workspacePath}`);
     }
 
+    // Use correct workspace database for task operations
+    const { initializeWorkspaceDatabase } = await import('../database/drizzle-connection.js');
+    const workspaceDb = await initializeWorkspaceDatabase(workspace.path);
+
     // Preserve existing tasks if requested
     let existingTasks: Task[] = [];
     if (preserveTasks) {
-      const dbTasks = await this.drizzleManager.getDb().select()
+      const dbTasks = await workspaceDb.getDb().select()
         .from(tasks)
         .all();
       
@@ -464,8 +506,8 @@ export class ProjectInitializer {
         completed_at: dbTask.completedAt || undefined
       }));
     } else {
-      // Clear existing tasks
-      await this.drizzleManager.getDb().delete(tasks);
+      // Clear existing tasks from workspace database
+      await workspaceDb.getDb().delete(tasks);
     }
 
     // Update workspace rules

@@ -4,6 +4,8 @@ import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
 import type { TaskPilotToolResult } from '../types/index.js';
 import { PromptOrchestrator } from '../services/prompt-orchestrator.js';
 import { GlobalDatabaseService } from '../database/global-queries.js';
+import { WorkspaceDatabaseService } from '../database/workspace-queries.js';
+import type { NewTask } from '../database/schema/workspace-schema.js';
 
 // Input schema for taskpilot_create_task tool
 export const createTaskToolSchema = z.object({
@@ -57,7 +59,28 @@ export class CreateTaskTool {
       const taskId = await this.generateTaskId(workspace.id);
       const taskTitle = title || this.generateTitleFromDescription(task_description);
 
-      // Generate orchestrated prompt response with task creation instructions
+      // Create task in workspace database
+      const workspaceDb = new WorkspaceDatabaseService(workspace_path);
+      await workspaceDb.initialize();
+
+      const newTask: NewTask = {
+        id: taskId,
+        title: taskTitle,
+        description: task_description,
+        priority: priority.toLowerCase() as 'high' | 'medium' | 'low',
+        status: 'backlog',
+        progress: 0,
+        dependencies: JSON.stringify([]),
+        connectedFiles: JSON.stringify([]),
+        notes: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        completedAt: null
+      };
+
+      const createdTask = await workspaceDb.createTask(newTask);
+
+      // Generate orchestrated prompt response with task creation confirmation
       const orchestrationResult = await this.orchestrator.orchestratePrompt(
         'taskpilot_create_task',
         workspace.id,
@@ -68,11 +91,8 @@ export class CreateTaskTool {
           priority,
           parent_task_id,
           workspace_name: workspace.name,
-          created_at: new Date().toISOString(),
-          timestamp: new Date().toISOString(),
-          // Include instructions for file-based task creation
-          task_file_path: `${workspace_path}/.task/todo/current.md`,
-          task_creation_instructions: 'Create task entry in .task/todo/current.md file with proper formatting'
+          created_at: createdTask.createdAt,
+          timestamp: new Date().toISOString()
         }
       );
 

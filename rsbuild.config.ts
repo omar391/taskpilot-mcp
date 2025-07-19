@@ -25,11 +25,22 @@ export default defineConfig({
   tools: {
     rspack: {
       target: 'node18',
+      output: {
+        module: true,
+        chunkFormat: 'module',
+        library: {
+          type: 'module',
+        },
+      },
+      experiments: {
+        outputModule: true,
+      },
+      externalsType: 'module',
       externals: {
         // Mark these as external to avoid bundling them
-        'better-sqlite3': 'commonjs better-sqlite3',
-        'sqlite3': 'commonjs sqlite3',
-        'express': 'commonjs express',
+        'better-sqlite3': 'better-sqlite3',
+        'sqlite3': 'sqlite3',
+        'express': 'express',
       },
       node: {
         // Preserve __dirname and __filename

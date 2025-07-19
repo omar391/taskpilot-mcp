@@ -139,12 +139,28 @@ export class PromptOrchestrator {
     return {
       workspace_path: args.workspace_path || 'current directory',
       workspace_id: workspaceId,
+      workspace_name: args.workspace_name || 'TaskPilot Project',
       task_description: args.description || args.task_description || 'No description',
       task_id: args.task_id || 'Unknown task',
+      task_title: args.task_title || 'Untitled Task',
+      task_priority: args.priority || 'Medium',
+      task_status: args.task_status || 'Backlog',
+      task_progress: args.task_progress?.toString() || '0',
       repository_url: args.repository_url || 'No repository specified',
       timestamp: new Date().toISOString(),
+      created_at: args.created_at || new Date().toISOString(),
+      updated_at: args.updated_at || new Date().toISOString(),
       project_name: args.project_name || 'TaskPilot Project',
-      tech_stack: args.tech_stack || 'Not specified'
+      tech_stack: args.tech_stack || 'Not specified',
+      workspace_rules: args.workspace_rules || '',
+      session_id: args.session_id || 'unknown',
+      parent_task_id: args.parent_task_id || '',
+      connected_files: args.connected_files || '',
+      notes: args.notes || '',
+      field_updated: args.field_updated || '',
+      old_value: args.old_value || '',
+      new_value: args.new_value || '',
+      reason: args.reason || ''
     };
   }
 

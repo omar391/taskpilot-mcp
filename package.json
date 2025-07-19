@@ -22,6 +22,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
+    "test:tool": "npx tsx src/cli.ts",
     "lint": "npm run lint:server && npm run lint:ui",
     "lint:server": "tsc --noEmit",
     "lint:ui": "cd ui && tsc --noEmit",
