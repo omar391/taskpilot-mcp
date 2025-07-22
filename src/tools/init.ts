@@ -41,7 +41,7 @@ export class InitTool {
     try {
       const { workspace_path, project_requirements, tech_stack, project_name } = input;
 
-      // Initialize the project
+      // Initialize the project structure and database
       const initResult = await this.projectInitializer.initializeProject({
         workspace_path,
         project_requirements: project_requirements || 'Standard project setup',
@@ -49,10 +49,8 @@ export class InitTool {
         project_name: project_name || this.extractProjectNameFromPath(workspace_path)
       });
 
-      // Get workspace rules after initialization
-      const workspaceRules = await this.getWorkspaceRules(initResult.workspace.id);
-
-      // Generate orchestrated prompt with comprehensive context
+      // Generate orchestrated prompt with init_feedback that will guide the LLM through
+      // the analytical framework and resource creation process
       const orchestrationResult = await this.orchestrator.orchestratePrompt(
         'taskpilot_init',
         initResult.workspace.id,
@@ -61,11 +59,11 @@ export class InitTool {
           workspace_path,
           session_id: `init-${Date.now()}`,
           timestamp: new Date().toISOString(),
-          workspace_rules: workspaceRules,
-          project_requirements,
-          tech_stack,
+          project_requirements: project_requirements || 'Standard project setup',
+          tech_stack: tech_stack || 'TypeScript/Node.js',
           initialization_complete: true,
-          created_tasks: initResult.initialTasks
+          is_empty_project: initResult.isEmpty || false,
+          analysis_framework_feedback: this.getAnalysisFrameworkFeedback()
         }
       );
 
@@ -85,6 +83,18 @@ export class InitTool {
         isError: true
       };
     }
+  }
+
+  /**
+   * Get analysis framework feedback steps
+   */
+  private getAnalysisFrameworkFeedback(): string {
+    return `1. **Logical Consistency** - Evaluate statements for internal coherence and contradictions
+2. **Evidence Quality** - Assess the strength and reliability of supporting data/reasoning
+3. **Hidden Assumptions** - Identify unstated premises that may affect outcomes
+4. **Cognitive Biases** - Detect emotional reasoning, confirmation bias, or wishful thinking
+5. **Causal Relationships** - Verify claimed cause-and-effect relationships are valid
+6. **Alternative Perspectives** - Consider competing explanations or approaches`;
   }
 
   /**

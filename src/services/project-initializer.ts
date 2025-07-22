@@ -41,6 +41,7 @@ export interface ProjectInitializationResult {
   };
   initialTasks: Task[];
   workspaceRulesCreated: boolean;
+  isEmpty?: boolean;
 }
 
 /**
@@ -69,11 +70,11 @@ export class ProjectInitializer {
       // Step 1: Create or ensure workspace exists
       const workspace = await this.ensureWorkspace(workspace_path, project_name);
 
-      // Step 2: Create initial project tasks
-      const initialTasks = await this.createInitialTasks(workspace.id, project_requirements, tech_stack);
+      // Step 2: Initialize database structure (no initial tasks created here)
+      await this.initializeWorkspaceDatabase(workspace.id, workspace_path);
 
-      // Step 3: Set up workspace-specific rules
-      const workspaceRulesCreated = await this.createWorkspaceRules(workspace.id, tech_stack);
+      // Step 3: Check if project is empty or needs reinitialization  
+      const isEmpty = await this.checkIfProjectIsEmpty(workspace_path);
 
       // Step 4: Create initial session
       await this.createInitialSession(workspace.id);
@@ -84,12 +85,44 @@ export class ProjectInitializer {
           path: workspace.path,
           name: workspace.name
         },
-        initialTasks,
-        workspaceRulesCreated
+        initialTasks: [], // No initial tasks created during init
+        workspaceRulesCreated: false, // Will be handled by init_feedback flow
+        isEmpty
       };
     } catch (error) {
       console.error('Error initializing project:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Initialize workspace database structure
+   */
+  private async initializeWorkspaceDatabase(workspaceId: string, workspacePath: string): Promise<void> {
+    // Import and initialize the workspace database service for the workspace
+    const { initializeWorkspaceDatabase } = await import('../database/drizzle-connection.js');
+    await initializeWorkspaceDatabase(workspacePath);
+  }
+
+  /**
+   * Check if project is empty (for determining init flow)
+   */
+  private async checkIfProjectIsEmpty(workspacePath: string): Promise<boolean> {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+
+    try {
+      const entries = await fs.readdir(workspacePath);
+      // Consider project empty if only has common build/config files
+      const meaningfulFiles = entries.filter(entry =>
+        !entry.startsWith('.') &&
+        !['node_modules', 'package.json', 'package-lock.json', 'bun.lockb',
+          'tsconfig.json', 'README.md', 'build', 'dist'].includes(entry)
+      );
+      return meaningfulFiles.length === 0;
+    } catch (error) {
+      // If directory doesn't exist or can't be read, consider it empty
+      return true;
     }
   }
 

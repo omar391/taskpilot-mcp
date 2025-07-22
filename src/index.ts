@@ -38,6 +38,8 @@ import { FocusTool, focusToolSchema } from './tools/focus.js';
 import { GitHubTool, githubToolSchema } from './tools/github.js';
 import { RuleUpdateTool, ruleUpdateToolSchema } from './tools/rule-update.js';
 import { RemoteInterfaceTool, remoteInterfaceToolSchema } from './tools/remote-interface.js';
+import { UpdateResourcesTool, updateResourcesToolSchema } from './tools/update-resources.js';
+import { UpdateStepsTool, updateStepsToolSchema } from './tools/update-steps.js';
 import { InstanceManager } from './server/instance-manager.js';
 
 // Global variables
@@ -54,6 +56,8 @@ let focusTool: FocusTool;
 let githubTool: GitHubTool;
 let ruleUpdateTool: RuleUpdateTool;
 let remoteInterfaceTool: RemoteInterfaceTool;
+let updateResourcesTool: UpdateResourcesTool;
+let updateStepsTool: UpdateStepsTool;
 
 let globalDbService: any;
 let databaseService: DatabaseService;
@@ -85,6 +89,8 @@ async function initializeServer() {
     githubTool = new GitHubTool(globalDrizzleManager);
     ruleUpdateTool = new RuleUpdateTool(globalDrizzleManager);
     remoteInterfaceTool = new RemoteInterfaceTool(globalDrizzleManager);
+    updateResourcesTool = new UpdateResourcesTool(globalDrizzleManager);
+    updateStepsTool = new UpdateStepsTool(globalDrizzleManager);
 
     // Initialize global seed data using pure TypeScript approach
     await seedManager.initializeGlobalData();
@@ -154,6 +160,16 @@ function createMCPToolHandlers(): MCPToolHandlers {
             name: "taskpilot_remote_interface",
             description: "Manage connections to external systems for task synchronization",
             inputSchema: zodToJsonSchema(remoteInterfaceToolSchema),
+          },
+          {
+            name: "taskpilot_update_resources",
+            description: "Update project documentation resources like project.md and design.md",
+            inputSchema: zodToJsonSchema(updateResourcesToolSchema),
+          },
+          {
+            name: "taskpilot_update_steps",
+            description: "Update workspace-specific feedback steps and validation rules",
+            inputSchema: zodToJsonSchema(updateStepsToolSchema),
           },
         ],
       };
@@ -255,6 +271,24 @@ function createMCPToolHandlers(): MCPToolHandlers {
           case 'taskpilot_remote_interface': {
             const input = remoteInterfaceToolSchema.parse(args);
             const result = await remoteInterfaceTool.execute(input);
+            return {
+              content: result.content,
+              isError: result.isError
+            };
+          }
+
+          case 'taskpilot_update_resources': {
+            const input = updateResourcesToolSchema.parse(args);
+            const result = await updateResourcesTool.execute(input);
+            return {
+              content: result.content,
+              isError: result.isError
+            };
+          }
+
+          case 'taskpilot_update_steps': {
+            const input = updateStepsToolSchema.parse(args);
+            const result = await updateStepsTool.execute(input);
             return {
               content: result.content,
               isError: result.isError

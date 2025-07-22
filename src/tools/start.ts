@@ -45,6 +45,9 @@ export class StartTool {
       // Get workspace rules if they exist
       const workspaceRules = await this.getWorkspaceRules(workspace.id);
       
+      // Get standard global rules
+      const standardGlobalRules = await this.getStandardGlobalRules();
+      
       // Generate orchestrated prompt with comprehensive context
       const orchestrationResult = await this.orchestrator.orchestratePrompt(
         'taskpilot_start',
@@ -54,7 +57,8 @@ export class StartTool {
           workspace_path: workspace_path,
           session_id: session.id,
           timestamp: new Date().toISOString(),
-          workspace_rules: workspaceRules
+          workspace_rules: workspaceRules,
+          standard_global_rules: standardGlobalRules
         }
       );
 
@@ -144,6 +148,19 @@ export class StartTool {
       return workspaceRulesStep?.templateContent || null;
     } catch (error) {
       console.error('Error fetching workspace rules:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get standard global rules from feedback steps
+   */
+  private async getStandardGlobalRules(): Promise<string | null> {
+    try {
+      const globalRulesStep = await this.globalDb.getFeedbackStepByName('standard_global_rules');
+      return globalRulesStep?.templateContent || null;
+    } catch (error) {
+      console.error('Error fetching standard global rules:', error);
       return null;
     }
   }

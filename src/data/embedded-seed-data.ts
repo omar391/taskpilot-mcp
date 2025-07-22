@@ -3,10 +3,10 @@
  * Uses Drizzle ORM types for compile-time type safety
  */
 
-import { 
-  type NewToolFlow, 
-  type NewFeedbackStep, 
-  type NewMcpServerMapping 
+import {
+  type NewToolFlow,
+  type NewFeedbackStep,
+  type NewMcpServerMapping
 } from '../database/schema/global-schema.js';
 
 // Tool Flows - Drizzle typed seed data
@@ -15,7 +15,7 @@ export const GLOBAL_TOOL_FLOWS_SEED: NewToolFlow[] = [
     id: 'tf_start_001',
     toolName: 'taskpilot_start',
     description: 'Initialize workspace context with comprehensive rules and guidelines',
-    feedbackStepId: 'workspace_context',
+    feedbackStepId: 'start_feedback',
     nextTool: 'end',
     isGlobal: true
   },
@@ -23,8 +23,8 @@ export const GLOBAL_TOOL_FLOWS_SEED: NewToolFlow[] = [
     id: 'tf_init_001',
     toolName: 'taskpilot_init',
     description: 'Initialize new project with workspace structure and rules',
-    feedbackStepId: 'workspace_context',
-    nextTool: 'end',
+    feedbackStepId: 'init_feedback',
+    nextTool: 'taskpilot_start',
     isGlobal: true
   },
   {
@@ -88,6 +88,22 @@ export const GLOBAL_TOOL_FLOWS_SEED: NewToolFlow[] = [
     toolName: 'taskpilot_rule_update',
     description: 'Update workspace rules (no feedback needed)',
     feedbackStepId: null,
+    nextTool: 'end',
+    isGlobal: true
+  },
+  {
+    id: 'tf_update_resources_001',
+    toolName: 'taskpilot_update_resources',
+    description: 'Update project documentation resources',
+    feedbackStepId: 'update_resources_success',
+    nextTool: 'end',
+    isGlobal: true
+  },
+  {
+    id: 'tf_update_steps_001',
+    toolName: 'taskpilot_update_steps',
+    description: 'Update workspace-specific feedback steps',
+    feedbackStepId: 'update_steps_success',
     nextTool: 'end',
     isGlobal: true
   }
@@ -164,6 +180,41 @@ export const GLOBAL_FEEDBACK_STEPS_SEED: NewFeedbackStep[] = [
     description: 'Comprehensive workspace context with rules and guidelines',
     templateContent: "# 🚀 TaskPilot Workspace Context - {{context.workspace_name}}\n\n**Workspace:** {{context.workspace_name}}\n**Path:** {{context.workspace_path}}\n**Session ID:** {{context.session_id}}\n**Initialized:** {{context.timestamp}}\n\n---\n\n## 📋 STANDARD RULES (Global)\n\n### Core Workflow Principles\n- Always review `./.task/project.md` and both rules files before starting work\n- Check for existing code before creating new functionality\n- Workspace rules override standard rules when conflicts exist\n- Apply Analytical Thinking Framework to all technical decisions\n\n### Task Management\n- Decompose work into individually testable units\n- Structure tasks to deliver incremental value\n- Mark 100% complete only when lint and unit tests pass\n- Update connected file lists with all modified files\n\n### Development Standards\n- Favor pure functions with clear inputs and outputs\n- Always audit existing codebase before creating new implementations\n- Follow established technology stack and architectural patterns\n- Create git commits with task ID references\n\n---\n\n## 🏠 WORKSPACE RULES (Specific)\n\n{{context.workspace_rules ? context.workspace_rules : '_No workspace-specific rules defined yet._'}}\n\n---\n\n## 🧠 ANALYTICAL THINKING FRAMEWORK\n\n**Apply this 6-step framework to all technical decisions:**\n\n1. **Logical Consistency** - Evaluate statements for internal coherence and contradictions\n2. **Evidence Quality** - Assess the strength and reliability of supporting data/reasoning\n3. **Hidden Assumptions** - Identify unstated premises that may affect outcomes\n4. **Cognitive Biases** - Detect emotional reasoning, confirmation bias, or wishful thinking\n5. **Causal Relationships** - Verify claimed cause-and-effect relationships are valid\n6. **Alternative Perspectives** - Consider competing explanations or approaches\n\n**Response Protocol:**\n- Use \"I notice...\" statements for constructive challenges\n- Require concrete justification for technical decisions\n- Question the source and validity of beliefs/requirements\n- Explore strongest version of opposing views\n- Reward self-correction and acknowledge strong reasoning\n\n---\n\n## ⚡ READY FOR COMMANDS\n\nWorkspace is initialized and ready. You now have full context of:\n- ✅ Global development standards and principles\n- ✅ Workspace-specific rules and constraints\n- ✅ Analytical framework for decision-making\n- ✅ Task management and workflow processes\n\n**Next:** Use TaskPilot commands like `taskpilot_add`, `taskpilot_status`, or `taskpilot_focus` to manage your development workflow.",
     isGlobal: true
+  },
+  {
+    id: 'fs_standard_global_rules',
+    name: 'standard_global_rules',
+    description: 'Base global development rules and standards',
+    templateContent: "## Core Workflow Principles\n- Always review `./.task/project.md` and both rules files before starting work\n- Check for existing code before creating new functionality\n- Workspace rules override standard rules when conflicts exist\n- Apply Analytical Thinking Framework to all technical decisions\n\n## Task Management\n- Decompose work into individually testable units\n- Structure tasks to deliver incremental value\n- Mark 100% complete only when lint and unit tests pass\n- Update connected file lists with all modified files\n\n## Development Standards\n- Favor pure functions with clear inputs and outputs\n- Always audit existing codebase before creating new implementations\n- Follow established technology stack and architectural patterns\n- Create git commits with task ID references\n\n## Analytical Thinking Framework\n**Apply this 6-step framework to all technical decisions:**\n1. **Logical Consistency** - Evaluate statements for internal coherence and contradictions\n2. **Evidence Quality** - Assess the strength and reliability of supporting data/reasoning\n3. **Hidden Assumptions** - Identify unstated premises that may affect outcomes\n4. **Cognitive Biases** - Detect emotional reasoning, confirmation bias, or wishful thinking\n5. **Causal Relationships** - Verify claimed cause-and-effect relationships are valid\n6. **Alternative Perspectives** - Consider competing explanations or approaches",
+    isGlobal: true
+  },
+  {
+    id: 'fs_init_feedback',
+    name: 'init_feedback',
+    description: 'Feedback steps for project initialization process',
+    templateContent: "Use the following analytic framework steps to ask questions and gather information about the project requirements in a structured and detailed way:\n{{context.analysis_framework_feedback}}\n\nAsk user all detailed questions about the project requirements, architecture, and design decisions. Then after you get the ideal project requirements, you can create/update the \"project.md\" and \"design.md\" resources using \"update_resources\" tool call. Also use `update_steps` tool to update the `workspace_rules_feedback` step.\n\n--\n\nHowever if the project is not empty or the user wants to reinitialize the project, we will follow these steps along with the analysis framework:\n\nFocus on discovering the essential knowledge that would help an AI agents be immediately productive in this codebase. Consider aspects like:\n- The \"big picture\" architecture that requires reading multiple files to understand - major components, service boundaries, data flows, and the \"why\" behind structural decisions\n- Critical developer workflows (builds, tests, debugging) especially commands that aren't obvious from file inspection alone\n- Project-specific conventions and patterns that differ from common practices\n- Integration points, external dependencies, and cross-component communication patterns\n\nSource existing AI conventions from `**/{.github/copilot-instructions.md,AGENT.md,AGENTS.md,CLAUDE.md,.cursorrules,.windsurfrules,.clinerules,.cursor/rules/**,.windsurf/rules/**,.clinerules/**,README.md}` (do one glob search).\n\nGuidelines:\n- If such rules files exist, merge intelligently - collect valuable content while updating outdated sections\n- Write concise, actionable instructions (~20-50 lines) using markdown structure\n- Include specific examples from the codebase when describing patterns\n- Avoid generic advice (\"write tests\", \"handle errors\") - focus on THIS project's specific approaches\n- Document only discoverable patterns, not aspirational practices\n- Reference key files/directories that exemplify important patterns\n\nuse update_workspace_rules tool to update the workspace_rules feedback step.",
+    isGlobal: true
+  },
+  {
+    id: 'fs_start_feedback',
+    name: 'start_feedback',
+    description: 'Feedback for start command with global and workspace rules',
+    templateContent: "Our global standard rules are:\n{{context.standard_global_rules}}\n\nAnd the workspace rules are:\n{{context.workspace_rules}}\n\nRemember: workspace rules are more important than global rules, so if there is a conflict, use the workspace rules.",
+    isGlobal: true
+  },
+  {
+    id: 'fs_update_resources_success',
+    name: 'update_resources_success',
+    description: 'Confirmation message for resource file updates',
+    templateContent: "# Resource Updated Successfully\n\n**Resource Type:** {{context.resource_type}}\n**Workspace:** {{context.workspace_name}}\n**File Path:** {{context.resource_file_path}}\n**Updated At:** {{context.timestamp}}\n{{context.reason ? '**Reason:** ' + context.reason + '\\n' : ''}}\n\nThe {{context.resource_type}} resource has been successfully updated with the new content. The file is now available in the .taskpilot directory structure.\n\n**Next Steps:** The updated documentation will be available for future TaskPilot operations and can be referenced by other tools and commands.",
+    isGlobal: true
+  },
+  {
+    id: 'fs_update_steps_success',
+    name: 'update_steps_success',
+    description: 'Confirmation message for feedback step updates',
+    templateContent: "# Feedback Step Updated Successfully\n\n**Step Name:** {{context.step_name}}\n**Workspace:** {{context.workspace_name}}\n**Updated At:** {{context.timestamp}}\n{{context.reason ? '**Reason:** ' + context.reason + '\\n' : ''}}\n\nThe feedback step '{{context.step_name}}' has been successfully updated in the workspace database. This step will now be used in future tool orchestration and workflow processes.\n\n**Next Steps:** The updated feedback step will be applied automatically in relevant tool flows and will influence how the system provides guidance and validation.",
+    isGlobal: true
   }
 ];
 
@@ -177,7 +228,7 @@ export const MCP_SERVER_MAPPINGS_SEED: NewMcpServerMapping[] = [
     isDefault: true
   },
   {
-    id: "msm_jira_001", 
+    id: "msm_jira_001",
     interfaceType: "jira",
     mcpServerName: "jira-mcp",
     description: "Jira MCP Server for project and issue tracking",
@@ -185,7 +236,7 @@ export const MCP_SERVER_MAPPINGS_SEED: NewMcpServerMapping[] = [
   },
   {
     id: "msm_linear_001",
-    interfaceType: "linear", 
+    interfaceType: "linear",
     mcpServerName: "linear-mcp",
     description: "Linear MCP Server for team issue tracking",
     isDefault: true
@@ -193,7 +244,7 @@ export const MCP_SERVER_MAPPINGS_SEED: NewMcpServerMapping[] = [
   {
     id: "msm_asana_001",
     interfaceType: "asana",
-    mcpServerName: "asana-mcp", 
+    mcpServerName: "asana-mcp",
     description: "Asana MCP Server for project management",
     isDefault: true
   },
