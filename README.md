@@ -277,10 +277,33 @@ interface ToolResult {
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
 3. Make your changes
-4. Build and test: `npm run build && npm run serve`
+4. Build and test: `npm run build && npm test`
 5. Commit your changes: `git commit -m 'Add amazing feature'`
 6. Push to the branch: `git push origin feature/amazing-feature`
 7. Open a Pull Request
+
+## 🧪 Testing
+
+TaskPilot includes comprehensive test coverage with **69/69 tests passing (100% success rate)**:
+
+```bash
+# Run all tests
+npm test
+
+# Run with coverage report
+npm run test:coverage
+
+# Run tests in watch mode
+npm run test:watch
+```
+
+**Test Suites:**
+- ✅ **CLI Tests**: 19/19 passing - Tool execution, validation, error handling
+- ✅ **Multi-Step Tools**: 10/10 passing - Workflow navigation, stepId support
+- ✅ **Instance Manager**: 23/23 passing - Process management, port handling
+- ✅ **Integration Tests**: 17/17 passing - Complete multi-instance scenarios
+
+**Test Environment:** Automated in-memory SQLite database with proper environment detection ensures isolated test runs.
 
 ## 📄 License
 

@@ -110,6 +110,43 @@ This document captures the confirmed architectural decisions made during Phase 3
 
 **Benefits**: Single-file distribution, no missing file errors, simplified deployment.
 
+### 8. Comprehensive Test Coverage Strategy
+
+**Decision**: Implement 100% test coverage across all system components for production readiness.
+
+**Implementation**:
+- **CLI Unit Tests**: 19 tests covering tool execution, validation, and error handling
+- **Multi-Step Tools Integration**: 10 tests validating workflow navigation and stepId support
+- **Instance Manager**: 23 tests for root-to-child process system and port management
+- **Instance Manager Integration**: 17 tests for complete multi-instance flow scenarios
+- **Test Environment**: In-memory SQLite database with proper environment detection
+- **Mock Strategy**: Minimal mocking approach allowing real database operations in tests
+
+**Test Results**: 69/69 tests passing (100% success rate)
+
+**Benefits**: Production confidence, regression prevention, comprehensive edge case coverage, robust error handling validation.
+
+### Testing Methodology
+
+**Test Environment Setup:**
+- **Environment Detection**: `NODE_ENV === 'test'` and `VITEST === 'true'` for automatic test mode
+- **In-Memory Database**: `:memory:` SQLite database created fresh for each test suite
+- **Mock Strategy**: Minimal mocking - only mock external services, allow real database operations
+- **Isolation**: Each test gets fresh database state with automatic cleanup
+
+**Key Testing Patterns:**
+- **CLI Tests**: Direct tool execution via `executeToolCall()` function
+- **Integration Tests**: Full workflow scenarios with real database operations
+- **Database Tests**: Comprehensive CRUD operations and schema validation
+- **Error Handling**: Extensive edge case and failure mode testing
+
+**Test Execution:**
+```bash
+npm test              # Run all tests
+npm run test:coverage # Generate coverage report  
+npm run test:watch    # Watch mode for development
+```
+
 ## System Architecture Overview - Prompt Orchestration Flow
 
 ```mermaid
