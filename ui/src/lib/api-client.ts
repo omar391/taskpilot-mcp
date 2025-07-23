@@ -247,6 +247,13 @@ export class TaskPilotApiClient {
     })
   }
 
+  async updateToolFlow(workspaceId: string, flowId: string, flow: Partial<ToolFlow>): Promise<ApiResponse<{ toolFlow: ToolFlow }>> {
+    return this.makeRequest<{ toolFlow: ToolFlow }>(`/api/workspaces/${workspaceId}/tool-flows/${flowId}`, {
+      method: 'PUT',
+      body: JSON.stringify(flow),
+    })
+  }
+
   // ========================================
   // Feedback Steps API
   // ========================================

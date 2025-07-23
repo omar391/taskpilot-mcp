@@ -24,51 +24,138 @@ import { RemoteInterfaceTool, remoteInterfaceToolSchema } from './tools/remote-i
  * Example: npm run test:tool -- taskpilot_start '{"workspace_path": "/tmp/test-workspace"}'
  */
 
-async function initializeTools() {
-    // Initialize global database using pure Drizzle system
-    const globalDbService = await initializeGlobalDatabaseService();
-    const globalDrizzleManager = globalDbService.getDrizzleManager();
+// Global variables
+let toolsInitialized = false;
+let globalDbService: any = null;
+let globalDrizzleManager: any = null;
 
-    // Initialize services with pure Drizzle operations
-    const seedManager = new SeedManager(globalDrizzleManager);
-    const orchestrator = new PromptOrchestrator(globalDrizzleManager);
+async function initializeTools(): Promise<{
+    tools: Record<string, any>;
+    schemas: Record<string, any>;
+}> {
+    if (toolsInitialized && globalDrizzleManager) {
+        // Return cached tools
+        const tools = {
+            taskpilot_init: new InitTool(globalDrizzleManager),
+            taskpilot_start: new StartTool(globalDrizzleManager),
+            taskpilot_add: new AddTool(globalDrizzleManager),
+            taskpilot_create_task: new CreateTaskTool(globalDrizzleManager),
+            taskpilot_status: new StatusTool(globalDrizzleManager),
+            taskpilot_update: new UpdateTool(globalDrizzleManager),
+            taskpilot_audit: new AuditTool(globalDrizzleManager),
+            taskpilot_focus: new FocusTool(globalDrizzleManager),
+            taskpilot_github: new GitHubTool(globalDrizzleManager),
+            taskpilot_rule_update: new RuleUpdateTool(globalDrizzleManager),
+            taskpilot_remote_interface: new RemoteInterfaceTool(globalDrizzleManager),
+        };
 
-    // Initialize tools with pure Drizzle database manager
-    const tools = {
-        taskpilot_init: new InitTool(globalDrizzleManager),
-        taskpilot_start: new StartTool(globalDrizzleManager),
-        taskpilot_add: new AddTool(globalDrizzleManager),
-        taskpilot_create_task: new CreateTaskTool(globalDrizzleManager),
-        taskpilot_status: new StatusTool(globalDrizzleManager),
-        taskpilot_update: new UpdateTool(globalDrizzleManager),
-        taskpilot_audit: new AuditTool(globalDrizzleManager),
-        taskpilot_focus: new FocusTool(globalDrizzleManager),
-        taskpilot_github: new GitHubTool(globalDrizzleManager),
-        taskpilot_rule_update: new RuleUpdateTool(globalDrizzleManager),
-        taskpilot_remote_interface: new RemoteInterfaceTool(globalDrizzleManager),
-    };
+        const schemas = {
+            taskpilot_init: initToolSchema,
+            taskpilot_start: startToolSchema,
+            taskpilot_add: addToolSchema,
+            taskpilot_create_task: createTaskToolSchema,
+            taskpilot_status: statusToolSchema,
+            taskpilot_update: updateToolSchema,
+            taskpilot_audit: auditToolSchema,
+            taskpilot_focus: focusToolSchema,
+            taskpilot_github: githubToolSchema,
+            taskpilot_rule_update: ruleUpdateToolSchema,
+            taskpilot_remote_interface: remoteInterfaceToolSchema,
+        };
 
-    const schemas = {
-        taskpilot_init: initToolSchema,
-        taskpilot_start: startToolSchema,
-        taskpilot_add: addToolSchema,
-        taskpilot_create_task: createTaskToolSchema,
-        taskpilot_status: statusToolSchema,
-        taskpilot_update: updateToolSchema,
-        taskpilot_audit: auditToolSchema,
-        taskpilot_focus: focusToolSchema,
-        taskpilot_github: githubToolSchema,
-        taskpilot_rule_update: ruleUpdateToolSchema,
-        taskpilot_remote_interface: remoteInterfaceToolSchema,
-    };
+        return { tools, schemas };
+    }
 
-    // Initialize global seed data
-    await seedManager.initializeGlobalData();
+    try {
+        // Check if we're in a test environment
+        const isTest = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
 
-    return { tools, schemas };
+        if (isTest) {
+            // Create in-memory database for tests
+            const { DrizzleDatabaseManager, DatabaseType } = await import('./database/drizzle-connection.js');
+            const inMemoryDb = new DrizzleDatabaseManager(':memory:', DatabaseType.GLOBAL);
+            await inMemoryDb.initialize();
+
+            const { GlobalDatabaseService } = await import('./database/global-queries.js');
+            globalDbService = new GlobalDatabaseService(inMemoryDb);
+            await globalDbService.initialize();
+        } else {
+            // Production environment
+            globalDbService = (await import('./database/global-queries.js')).getGlobalDatabaseService();
+            await globalDbService.initialize();
+        }
+    } catch (error) {
+        console.error('Error initializing database:', error);
+        console.error('Error stack:', (error as Error).stack);
+        globalDbService = null;
+    }
+
+    if (!globalDbService) {
+        throw new Error('Failed to initialize global database service');
+    }
+
+    try {
+        globalDrizzleManager = globalDbService.getDrizzleManager();
+
+        // Mark tools as initialized
+        toolsInitialized = true;
+
+        // Create tool instances
+        const tools = {
+            taskpilot_init: new InitTool(globalDrizzleManager),
+            taskpilot_start: new StartTool(globalDrizzleManager),
+            taskpilot_add: new AddTool(globalDrizzleManager),
+            taskpilot_create_task: new CreateTaskTool(globalDrizzleManager),
+            taskpilot_status: new StatusTool(globalDrizzleManager),
+            taskpilot_update: new UpdateTool(globalDrizzleManager),
+            taskpilot_audit: new AuditTool(globalDrizzleManager),
+            taskpilot_focus: new FocusTool(globalDrizzleManager),
+            taskpilot_github: new GitHubTool(globalDrizzleManager),
+            taskpilot_rule_update: new RuleUpdateTool(globalDrizzleManager),
+            taskpilot_remote_interface: new RemoteInterfaceTool(globalDrizzleManager),
+        };
+
+        const schemas = {
+            taskpilot_init: initToolSchema,
+            taskpilot_start: startToolSchema,
+            taskpilot_add: addToolSchema,
+            taskpilot_create_task: createTaskToolSchema,
+            taskpilot_status: statusToolSchema,
+            taskpilot_update: updateToolSchema,
+            taskpilot_audit: auditToolSchema,
+            taskpilot_focus: focusToolSchema,
+            taskpilot_github: githubToolSchema,
+            taskpilot_rule_update: ruleUpdateToolSchema,
+            taskpilot_remote_interface: remoteInterfaceToolSchema,
+        };
+
+        return { tools, schemas };
+    } catch (error) {
+        console.error('Error getting drizzle manager:', error);
+        throw error;
+    }
 }
 
 async function executeToolCall(toolName: string, toolArguments: any) {
+    // Pre-validate tool name before initializing database
+    const validToolNames = [
+        'taskpilot_init',
+        'taskpilot_start',
+        'taskpilot_add',
+        'taskpilot_create_task',
+        'taskpilot_status',
+        'taskpilot_update',
+        'taskpilot_audit',
+        'taskpilot_focus',
+        'taskpilot_github',
+        'taskpilot_rule_update',
+        'taskpilot_remote_interface'
+    ];
+
+    if (!validToolNames.includes(toolName)) {
+        throw new Error(`Unknown tool: ${toolName}. Available tools: ${validToolNames.join(', ')}`);
+    }
+
     const { tools, schemas } = await initializeTools();
 
     if (!(toolName in tools)) {
@@ -107,6 +194,9 @@ async function executeToolCall(toolName: string, toolArguments: any) {
             throw new Error(`Unhandled tool: ${toolName}`);
     }
 }
+
+// Export for testing
+export { executeToolCall };
 
 async function main() {
     const args = process.argv.slice(2);
@@ -149,23 +239,39 @@ async function main() {
             console.log(`✅ Tool call succeeded (${endTime - startTime}ms)`);
             console.log('');
 
-            if (result.isError) {
-                console.log('⚠️  Tool returned error result:');
-            } else {
-                console.log('📋 Tool result:');
-            }
+            // Handle different result types (ToolStepResult vs TaskPilotToolResult)
+            if ('isFinalStep' in result) {
+                // ToolStepResult (multi-step flow)
+                console.log('📋 Multi-step tool result:');
+                console.log(result.feedback);
 
-            // Pretty print the result content
-            if (Array.isArray(result.content)) {
-                for (const item of result.content) {
-                    if (item.type === 'text') {
-                        console.log(item.text);
-                    } else {
-                        console.log(`[${item.type}]`, item);
-                    }
+                if (!result.isFinalStep && result.nextStepId) {
+                    console.log(`\n🔄 Next step available: ${result.nextStepId}`);
+                }
+
+                if (result.data) {
+                    console.log('\n📊 Step data:', JSON.stringify(result.data, null, 2));
                 }
             } else {
-                console.log(result);
+            // TaskPilotToolResult (traditional format)
+                if (result.isError) {
+                    console.log('⚠️  Tool returned error result:');
+                } else {
+                    console.log('📋 Tool result:');
+                }
+
+                // Pretty print the result content
+                if (Array.isArray(result.content)) {
+                    for (const item of result.content) {
+                        if (item.type === 'text') {
+                            console.log(item.text);
+                        } else {
+                            console.log(`[${item.type}]`, item);
+                        }
+                    }
+                } else {
+                    console.log(result);
+                }
             }
 
         } catch (error) {
@@ -187,7 +293,10 @@ process.on('unhandledRejection', (reason, promise) => {
     process.exit(1);
 });
 
-main().catch(error => {
-    console.error('❌ Fatal error:', error);
-    process.exit(1);
-});
+// Only run main when not in test environment
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+    main().catch(error => {
+        console.error('❌ Fatal error:', error);
+        process.exit(1);
+    });
+}

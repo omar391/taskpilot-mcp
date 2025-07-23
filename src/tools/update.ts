@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
-import type { TaskPilotToolResult } from '../types/index.js';
+import type { TaskPilotToolResult, ToolStepResult, MultiStepToolInput } from '../types/index.js';
 import { PromptOrchestrator } from '../services/prompt-orchestrator.js';
 import { GlobalDatabaseService } from '../database/global-queries.js';
 
-// Input schema for taskpilot_update tool
+// Input schema for taskpilot_update tool with multi-step support
 export const updateToolSchema = z.object({
+  stepId: z.string().optional().describe('Step ID for multi-step flow: validate, confirm'),
   task_id: z.string().describe('Task ID to update (e.g., TP-001)'),
   workspace_path: z.string().describe('Absolute path to the workspace directory'),
   field: z.enum(['title', 'description', 'priority', 'status', 'progress', 'notes', 'connected_files', 'blocked_by']).describe('Field to update'),
@@ -13,7 +14,7 @@ export const updateToolSchema = z.object({
   reason: z.string().optional().describe('Reason for the update (for audit trail)')
 });
 
-export type UpdateToolInput = z.infer<typeof updateToolSchema>;
+export type UpdateToolInput = z.infer<typeof updateToolSchema> & MultiStepToolInput;
 
 /**
  * TaskPilot Update Tool - Task Property Updates (Pure TypeScript/Drizzle)
@@ -32,70 +33,156 @@ export class UpdateTool {
   }
 
   /**
-   * Execute taskpilot_update tool
+   * Execute taskpilot_update tool with multi-step support
    */
-  async execute(input: UpdateToolInput): Promise<TaskPilotToolResult> {
+  async execute(input: UpdateToolInput): Promise<ToolStepResult> {
     try {
-      const { task_id, workspace_path, field, value, reason } = input;
+      const { task_id, workspace_path, field, value, reason, stepId } = input;
 
       // Get workspace
       const workspace = await this.globalDb.getWorkspaceByPath(workspace_path);
       if (!workspace) {
         return {
-          content: [{
-            type: 'text',
-            text: `Error: Workspace not found at path: ${workspace_path}. Please run taskpilot_start first to initialize the workspace.`
-          }],
-          isError: true
+          isFinalStep: true,
+          feedback: `Error: Workspace not found at path: ${workspace_path}. Please run taskpilot_start first to initialize the workspace.`,
+          data: { error: true, workspace_path: workspace_path }
         };
       }
 
-      // Generate orchestrated prompt for task update
-      const orchestrationResult = await this.orchestrator.orchestratePrompt(
-        'taskpilot_update',
-        workspace.id,
-        {
-          task_id,
-          workspace_path,
-          field,
-          value,
-          reason,
-          workspace_name: workspace.name,
-          timestamp: new Date().toISOString(),
-          // Include instructions for file-based task updates
-          task_file_path: `${workspace_path}/.task/todo/current.md`,
-          update_instructions: `Update task ${task_id} field '${field}' to '${value}' in .task/todo/current.md file`
-        }
-      );
+      // Handle multi-step flow
+      if (stepId === 'validate') {
+        return await this.handleValidateStep(workspace, task_id, workspace_path, field, value, reason);
+      } else if (stepId === 'confirm') {
+        return await this.handleConfirmStep(workspace, task_id, workspace_path, field, value, reason);
+      }
 
-      return {
-        content: [{
-          type: 'text',
-          text: orchestrationResult.prompt_text
-        }]
-      };
+      // Default: direct update (backward compatibility)
+      return await this.handleDirectUpdate(workspace, task_id, workspace_path, field, value, reason);
+
     } catch (error) {
       console.error('Error in taskpilot_update:', error);
       return {
-        content: [{
-          type: 'text',
-          text: `Error updating task: ${error instanceof Error ? error.message : 'Unknown error'}`
-        }],
-        isError: true
+        isFinalStep: true,
+        feedback: `Error updating task: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        data: { error: true, workspace_path: input.workspace_path }
       };
     }
   }
 
+  private async handleDirectUpdate(workspace: any, task_id: string, workspace_path: string, field: string, value: string, reason?: string): Promise<ToolStepResult> {
+    // Generate orchestrated prompt for immediate task update
+    const orchestrationResult = await this.orchestrator.orchestratePrompt(
+      'taskpilot_update',
+      workspace.id,
+      {
+        task_id,
+        workspace_path,
+        field,
+        value,
+        reason,
+        workspace_name: workspace.name,
+        timestamp: new Date().toISOString(),
+        task_file_path: `${workspace_path}/.task/todo/current.md`,
+        update_instructions: `Update task ${task_id} field '${field}' to '${value}' in .task/todo/current.md file${reason ? ` (Reason: ${reason})` : ''}`
+      }
+    );
+
+    return {
+      isFinalStep: true,
+      feedback: orchestrationResult.prompt_text,
+      data: {
+        task_id,
+        field,
+        value,
+        updated: true,
+        workspace_id: workspace.id
+      }
+    };
+  }
+
+  private async handleValidateStep(workspace: any, task_id: string, workspace_path: string, field: string, value: string, reason?: string): Promise<ToolStepResult> {
+    // Generate validation analysis
+    const orchestrationResult = await this.orchestrator.orchestratePrompt(
+      'taskpilot_update',
+      workspace.id,
+      {
+        task_id,
+        workspace_path,
+        field,
+        value,
+        reason,
+        validation_mode: true,
+        workspace_name: workspace.name,
+        timestamp: new Date().toISOString(),
+        task_file_path: `${workspace_path}/.task/todo/current.md`,
+        update_instructions: `Validate proposed update: task ${task_id} field '${field}' to '${value}'. Check for conflicts, dependencies, and rule compliance.`
+      }
+    );
+
+    return {
+      isFinalStep: false,
+      nextStepId: 'confirm',
+      feedback: orchestrationResult.prompt_text + '\n\n*Proceed to confirm step to apply the update*',
+      data: {
+        task_id,
+        field,
+        value,
+        reason,
+        validated: true,
+        workspace_id: workspace.id
+      }
+    };
+  }
+
+  private async handleConfirmStep(workspace: any, task_id: string, workspace_path: string, field: string, value: string, reason?: string): Promise<ToolStepResult> {
+    // Generate confirmation and perform update
+    const orchestrationResult = await this.orchestrator.orchestratePrompt(
+      'taskpilot_update',
+      workspace.id,
+      {
+        task_id,
+        workspace_path,
+        field,
+        value,
+        reason,
+        confirm_mode: true,
+        workspace_name: workspace.name,
+        timestamp: new Date().toISOString(),
+        task_file_path: `${workspace_path}/.task/todo/current.md`,
+        update_instructions: `CONFIRMED: Update task ${task_id} field '${field}' to '${value}' in .task/todo/current.md file${reason ? ` (Reason: ${reason})` : ''}`
+      }
+    );
+
+    return {
+      isFinalStep: true,
+      feedback: orchestrationResult.prompt_text,
+      data: {
+        task_id,
+        field,
+        value,
+        reason,
+        confirmed: true,
+        updated: true,
+        workspace_id: workspace.id
+      }
+    };
+  }
+
   /**
-   * Get tool definition for MCP server
+   * Get tool definition for MCP server with multi-step support
    */
   static getToolDefinition() {
     return {
       name: 'taskpilot_update',
-      description: 'Update task properties with audit trail and validation',
+      description: 'Update task properties with validation and audit trail. Supports stepId parameter.',
       inputSchema: {
         type: 'object',
         properties: {
+          stepId: {
+            type: 'string',
+            enum: ['validate', 'confirm'],
+            description: 'Optional step ID: validate (check update validity), confirm (apply after validation)'
+          },
           task_id: {
             type: 'string',
             description: 'Task ID to update (e.g., TP-001)'

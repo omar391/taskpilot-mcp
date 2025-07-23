@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToolFlowCard } from '@/components/tool-flow-card'
+import { WorkflowCanvas } from '@/components/WorkflowCanvas'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/page-header'
 import { SectionWithContent } from '@/components/ui/section-with-content'
-import { Globe, Building, AlertCircle, RefreshCw, Settings, Plus } from 'lucide-react'
+import { Globe, Building, AlertCircle, RefreshCw, Settings, Plus, ArrowLeft } from 'lucide-react'
 import { apiClient, type ToolFlow, type FeedbackStep, type WorkspaceMetadata } from '@/lib/api-client'
 import { tailwindClasses } from '@/lib/design-system'
 
@@ -49,6 +50,9 @@ export function ToolFlowsPage() {
   const [feedbackSteps, setFeedbackSteps] = useState<FeedbackStep[]>([])
   const [, setWorkspaces] = useState<WorkspaceMetadata[]>([])
   const [currentWorkspace, setCurrentWorkspace] = useState<Partial<WorkspaceMetadata> & { path: string }>({ path: 'Loading...' })
+  const [viewMode, setViewMode] = useState<'grid' | 'canvas'>('grid')
+  const [selectedFlow, setSelectedFlow] = useState<ToolFlow | null>(null)
+  const [isCreatingFlow, setIsCreatingFlow] = useState(false)
 
   // Load workspaces
   useEffect(() => {
@@ -133,9 +137,57 @@ export function ToolFlowsPage() {
   
   // Handle edit flow
   const handleEditFlow = (flow: ToolFlow) => {
-    // TODO: Implement edit flow
-    console.log('Edit flow:', flow);
+    setSelectedFlow(flow)
+    setViewMode('canvas')
   };
+
+  // Handle create new flow
+  const handleCreateFlow = () => {
+    setSelectedFlow(null)
+    setIsCreatingFlow(true)
+    setViewMode('canvas')
+  };
+
+  // Handle canvas save
+  const handleCanvasSave = async (flowData: Partial<ToolFlow>) => {
+    try {
+      setLoading(true)
+      if (selectedFlow) {
+        // Update existing flow
+        const response = await apiClient.updateToolFlow(workspaceId, selectedFlow.id, flowData)
+        if (response.error) {
+          throw new Error(response.error)
+        }
+        setWorkspaceFlows(prev => 
+          prev.map(flow => 
+            flow.id === selectedFlow.id ? { ...flow, ...flowData } : flow
+          )
+        )
+      } else {
+        // Create new flow
+        const response = await apiClient.createToolFlow(workspaceId, flowData)
+        if (response.error || !response.data?.toolFlow) {
+          throw new Error(response.error || 'Failed to create flow')
+        }
+        setWorkspaceFlows(prev => [...prev, response.data.toolFlow])
+      }
+      setViewMode('grid')
+      setSelectedFlow(null)
+      setIsCreatingFlow(false)
+    } catch (err) {
+      console.error('Failed to save flow:', err)
+      setError('Failed to save tool flow. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Handle canvas cancel
+  const handleCanvasCancel = () => {
+    setViewMode('grid')
+    setSelectedFlow(null)
+    setIsCreatingFlow(false)
+  }
   
   // Helper to get feedback step for a flow
   const getFeedbackStepForFlow = (flow: ToolFlow): FeedbackStep | null => {
@@ -339,6 +391,48 @@ export function ToolFlowsPage() {
     path: currentWorkspace.path || 'Loading...'
   };
 
+  // Render canvas view
+  if (viewMode === 'canvas') {
+    return (
+      <div className="space-y-6 h-screen flex flex-col">
+        {/* Canvas Header */}
+        <div className="flex items-center justify-between p-4 border-b bg-white dark:bg-gray-800">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCanvasCancel}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Flows
+            </Button>
+            <div>
+              <h2 className="font-semibold text-lg">
+                {selectedFlow ? `Edit: ${selectedFlow.tool_name}` : 'Create New Workflow'}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Design your workflow visually
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        {/* Canvas */}
+        <div className="flex-1 p-4">
+          <WorkflowCanvas
+            flow={selectedFlow || undefined}
+            feedbackSteps={feedbackSteps}
+            availableTools={availableTools}
+            onSave={handleCanvasSave}
+            onCancel={handleCanvasCancel}
+            isEditable={true}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  // Grid view (existing layout)
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -414,7 +508,10 @@ export function ToolFlowsPage() {
             emptyStateTitle="No workspace tool flows yet"
             emptyStateDescription="Create your first workspace tool flow to get started."
             actions={
-              <button className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-all duration-200 shadow-lg flex items-center gap-2">
+              <button 
+                onClick={handleCreateFlow}
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-all duration-200 shadow-lg flex items-center gap-2"
+              >
                 <Plus className="h-4 w-4" />
                 Create Flow
               </button>

@@ -103,6 +103,8 @@ export interface TaskPilotToolResult {
     text: string;
   }>;
   isError?: boolean;
+  // Multi-step tool support
+  stepResult?: ToolStepResult;
 }
 
 export interface MCPToolResult {
@@ -111,6 +113,21 @@ export interface MCPToolResult {
     text: string;
   }>;
   isError?: boolean;
+  // Multi-step tool support  
+  stepResult?: ToolStepResult;
+}
+
+// Multi-step tool flow types
+export interface ToolStepResult {
+  isFinalStep: boolean;
+  nextStepId?: string;
+  feedback?: string;
+  data?: any; // Context data passed between steps
+}
+
+export interface MultiStepToolInput {
+  stepId?: string;
+  [key: string]: any;
 }
 
 export type WorkspaceRule = {

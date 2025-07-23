@@ -634,7 +634,15 @@ export function getGlobalDatabaseService(): GlobalDatabaseService {
  * Initialize global database service
  */
 export async function initializeGlobalDatabaseService(): Promise<GlobalDatabaseService> {
-  const service = getGlobalDatabaseService();
-  await service.initialize();
-  return service;
+  try {
+    const service = getGlobalDatabaseService();
+    if (!service) {
+      throw new Error('Failed to get global database service instance');
+    }
+    await service.initialize();
+    return service;
+  } catch (error) {
+    console.error('Error initializing global database service:', error);
+    throw error;
+  }
 }

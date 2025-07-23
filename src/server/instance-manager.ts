@@ -106,6 +106,11 @@ export class InstanceManager {
 
   // Check if PID is alive
   static isPidAlive(pid: number): boolean {
+    // Invalid PIDs
+    if (pid <= 0) {
+      return false;
+    }
+
     try {
       process.kill(pid, 0);
       return true;

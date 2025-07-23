@@ -41,6 +41,37 @@ import { RemoteInterfaceTool, remoteInterfaceToolSchema } from './tools/remote-i
 import { UpdateResourcesTool, updateResourcesToolSchema } from './tools/update-resources.js';
 import { UpdateStepsTool, updateStepsToolSchema } from './tools/update-steps.js';
 import { InstanceManager } from './server/instance-manager.js';
+import { ToolStepResult, TaskPilotToolResult } from './types/index.js';
+
+/**
+ * Convert ToolStepResult to MCP-compatible format
+ */
+function convertToMCPResult(result: ToolStepResult | TaskPilotToolResult): TaskPilotToolResult {
+  if ('isFinalStep' in result) {
+    // ToolStepResult - convert to TaskPilotToolResult format
+    let feedback = result.feedback || '';
+
+    // Add step information to feedback
+    if (!result.isFinalStep && result.nextStepId) {
+      feedback += `\n\n[Multi-step flow: Next step available - ${result.nextStepId}]`;
+    }
+
+    if (result.data && Object.keys(result.data).length > 0) {
+      feedback += `\n\n[Step data: ${JSON.stringify(result.data)}]`;
+    }
+
+    return {
+      content: [{
+        type: 'text',
+        text: feedback
+      }],
+      isError: result.data?.error === true
+    };
+  }
+
+  // Already TaskPilotToolResult format
+  return result;
+}
 
 // Global variables
 let seedManager: SeedManager;
@@ -199,37 +230,25 @@ function createMCPToolHandlers(): MCPToolHandlers {
           case 'taskpilot_add': {
             const input = addToolSchema.parse(args);
             const result = await addTool.execute(input);
-            return {
-              content: result.content,
-              isError: result.isError
-            };
+            return convertToMCPResult(result);
           }
 
           case 'taskpilot_create_task': {
             const input = createTaskToolSchema.parse(args);
             const result = await createTaskTool.execute(input);
-            return {
-              content: result.content,
-              isError: result.isError
-            };
+            return convertToMCPResult(result);
           }
 
           case 'taskpilot_status': {
             const input = statusToolSchema.parse(args);
             const result = await statusTool.execute(input);
-            return {
-              content: result.content,
-              isError: result.isError
-            };
+            return convertToMCPResult(result);
           }
 
           case 'taskpilot_update': {
             const input = updateToolSchema.parse(args);
             const result = await updateTool.execute(input);
-            return {
-              content: result.content,
-              isError: result.isError
-            };
+            return convertToMCPResult(result);
           }
 
           case 'taskpilot_audit': {
@@ -244,10 +263,7 @@ function createMCPToolHandlers(): MCPToolHandlers {
           case 'taskpilot_focus': {
             const input = focusToolSchema.parse(args);
             const result = await focusTool.execute(input);
-            return {
-              content: result.content,
-              isError: result.isError
-            };
+            return convertToMCPResult(result);
           }
 
           case 'taskpilot_github': {
