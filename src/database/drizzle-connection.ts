@@ -20,6 +20,18 @@ export class DrizzleDatabaseManager {
   private isInitialized = false;
   private readonly dbType: DatabaseType;
 
+  get initialized(): boolean {
+    return this.isInitialized;
+  }
+
+  getConnectionInfo(): { hasDb: boolean; hasSqlite: boolean; dbPath: string } {
+    return {
+      hasDb: !!this.db,
+      hasSqlite: !!this.sqlite,
+      dbPath: this.dbPath
+    };
+  }
+
   constructor(
     private dbPath: string = ':memory:',
     dbType: DatabaseType = DatabaseType.WORKSPACE
@@ -145,6 +157,7 @@ export class DrizzleDatabaseManager {
           system_tool_fn TEXT NOT NULL,
           feedback_step TEXT,
           next_tool TEXT,
+          metadata TEXT DEFAULT '{}',
           created_at TEXT DEFAULT CURRENT_TIMESTAMP,
           updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (tool_flow_id) REFERENCES tool_flows(id) ON DELETE CASCADE
@@ -311,7 +324,7 @@ export class DrizzleDatabaseManager {
 
 // Database instances
 let globalDbInstance: DrizzleDatabaseManager | null = null;
-let workspaceDbInstance: DrizzleDatabaseManager | null = null;
+let workspaceDbInstances: Map<string, DrizzleDatabaseManager> = new Map();
 
 /**
  * Get or create global database instance
@@ -329,7 +342,20 @@ export function getGlobalDatabase(): DrizzleDatabaseManager {
  */
 export function getWorkspaceDatabase(workspacePath: string): DrizzleDatabaseManager {
   const workspaceDbPath = join(workspacePath, '.taskpilot', 'task.db');
-  return new DrizzleDatabaseManager(workspaceDbPath, DatabaseType.WORKSPACE);
+
+  // Check if we already have a cached instance for this workspace
+  if (!workspaceDbInstances.has(workspaceDbPath)) {
+    workspaceDbInstances.set(workspaceDbPath, new DrizzleDatabaseManager(workspaceDbPath, DatabaseType.WORKSPACE));
+  }
+
+  return workspaceDbInstances.get(workspaceDbPath)!;
+}
+
+/**
+ * Clear workspace database cache (for testing)
+ */
+export function clearWorkspaceDatabaseCache(): void {
+  workspaceDbInstances.clear();
 }
 
 /**

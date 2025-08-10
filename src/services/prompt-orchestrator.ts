@@ -1,13 +1,17 @@
 import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
 import type { PromptOrchestrationResult, ToolFlow, FeedbackStep } from '../types/index.js';
 import { SeedManager } from './seed-manager.js';
+import { NextStepTemplateGenerator } from './next-step-generator.js';
+import { ToolNames } from '../constants/tool-names.js';
 
 export class PromptOrchestrator {
   private seedManager: SeedManager;
+  private nextStepGenerator: NextStepTemplateGenerator;
 
   constructor(private drizzleDb: DrizzleDatabaseManager) {
     // Pure TypeScript approach - use DrizzleDatabaseManager directly
     this.seedManager = new SeedManager(drizzleDb);
+    this.nextStepGenerator = new NextStepTemplateGenerator(drizzleDb);
   }
 
   /**
@@ -77,12 +81,12 @@ export class PromptOrchestrator {
     args: Record<string, any>
   ): Promise<string> {
     switch (toolName) {
-      case 'taskpilot_start':
+      case ToolNames.START: // 'taskpilot_start'
         return `# TaskPilot Session Started\n\n` +
                `Workspace: ${args.workspace_path || 'current directory'}\n` +
                `Session ready for task management.`;
 
-      case 'taskpilot_init':
+      case ToolNames.INIT: // 'taskpilot_init'
         return `# TaskPilot Project Initialization\n\n` +
                `Project: ${args.project_name || 'TaskPilot Project'}\n` +
                `Workspace: ${args.workspace_path || 'current directory'}\n` +
@@ -90,7 +94,7 @@ export class PromptOrchestrator {
                `Requirements: ${args.project_requirements || 'No specific requirements'}\n\n` +
                `Ready to initialize project structure and rules.`;
 
-      case 'taskpilot_add':
+      case ToolNames.ADD: // 'taskpilot_add'
         return `# Task Creation Workflow\n\n` +
                `Task Description: ${args.description || args.task_description || 'No description provided'}\n\n` +
                `Ready to validate and create task.`;
@@ -98,31 +102,31 @@ export class PromptOrchestrator {
       case 'taskpilot_create_task':
         return `Task creation executed. Task details processed and stored.`;
 
-      case 'taskpilot_status':
+      case ToolNames.STATUS: // 'taskpilot_status'
         return `# Project Status Analysis\n\n` +
                `Generate comprehensive status report for the current workspace.`;
 
-      case 'taskpilot_update':
+      case ToolNames.UPDATE: // 'taskpilot_update'
         return `# Task Update Request\n\n` +
                `Target: ${args.target || 'unspecified target'}\n` +
                `Updates: ${args.updates || args.changes || 'No updates specified'}\n\n` +
                `Ready to apply changes.`;
 
-      case 'taskpilot_focus':
+      case ToolNames.FOCUS: // 'taskpilot_focus'
         return `# Task Focus Mode\n\n` +
                `Target Task: ${args.task_id || 'No task specified'}\n\n` +
                `Ready to begin focused work on specified task.`;
 
-      case 'taskpilot_audit':
+      case ToolNames.AUDIT: // 'taskpilot_audit'
         return `# Project Audit Workflow\n\n` +
                `Execute comprehensive project health assessment.`;
 
-      case 'taskpilot_github':
+      case ToolNames.GITHUB: // 'taskpilot_github'
         return `# GitHub Integration Workflow\n\n` +
                `Action: ${args.action || 'sync'}\n\n` +
                `Ready to execute GitHub synchronization and management.`;
 
-      case 'taskpilot_rule_update':
+      case ToolNames.RULE_UPDATE: // 'taskpilot_rule_update'
         return `# Workspace Rules Update\n\n` +
                `User Feedback: ${args.user_feedback || args.feedback || 'No feedback provided'}\n\n` +
                `Ready to process rule updates from user feedback.`;
@@ -162,6 +166,42 @@ export class PromptOrchestrator {
       new_value: args.new_value || '',
       reason: args.reason || ''
     };
+  }
+
+  /**
+   * Generate dynamic next step instructions instead of hardcoded text
+   */
+  async generateNextStepInstructions(
+    toolName: string,
+    currentStepId?: string,
+    workspaceId?: string,
+    context?: string
+  ): Promise<string> {
+    try {
+      const nextStepInstruction = await this.nextStepGenerator.generateNextStepInstructions(
+        toolName,
+        currentStepId,
+        workspaceId,
+        context
+      );
+
+      if (nextStepInstruction) {
+        return nextStepInstruction.instructionText;
+      }
+
+      // Fallback to completion instructions
+      const completionInstruction = await this.nextStepGenerator.generateCompletionInstructions(
+        toolName,
+        workspaceId,
+        context
+      );
+
+      return completionInstruction.instructionText;
+    } catch (error) {
+      console.error('Error generating next step instructions:', error);
+      // Fallback to basic instruction
+      return `Continue with ${toolName} workflow as needed.`;
+    }
   }
 
   /**

@@ -6,7 +6,8 @@
 import {
   type NewToolFlow,
   type NewFeedbackStep,
-  type NewMcpServerMapping
+  type NewMcpServerMapping,
+  type NewToolFlowStep
 } from '../database/schema/global-schema.js';
 
 // Tool Flows - Drizzle typed seed data
@@ -30,15 +31,7 @@ export const GLOBAL_TOOL_FLOWS_SEED: NewToolFlow[] = [
   {
     id: 'tf_add_001',
     toolName: 'taskpilot_add',
-    description: 'Add new task with analytical validation',
-    feedbackStepId: 'analytical_validation',
-    nextTool: 'taskpilot_create_task',
-    isGlobal: true
-  },
-  {
-    id: 'tf_create_001',
-    toolName: 'taskpilot_create_task',
-    description: 'Create task in database and provide confirmation',
+    description: 'Add new task with analytical validation and creation',
     feedbackStepId: 'task_creation_success',
     nextTool: 'end',
     isGlobal: true
@@ -261,5 +254,127 @@ export const MCP_SERVER_MAPPINGS_SEED: NewMcpServerMapping[] = [
     mcpServerName: "custom-rest-mcp",
     description: "Generic REST API MCP Server for custom integrations",
     isDefault: true
+  }
+];
+
+// Tool Flow Steps - Define actual steps for each tool flow
+export const GLOBAL_TOOL_FLOW_STEPS_SEED: NewToolFlowStep[] = [
+  // Status tool flow steps
+  {
+    id: 'step_status_overview',
+    toolFlowId: 'tf_status_001',
+    stepOrder: 1,
+    systemToolFn: 'status_overview',
+    feedbackStep: 'status_analysis',
+    nextTool: 'end',
+    metadata: {
+      description: 'Get comprehensive project status overview',
+      requiredContext: ['workspace_name', 'workspace_path']
+    }
+  },
+  {
+    id: 'step_status_details',
+    toolFlowId: 'tf_status_001',
+    stepOrder: 2,
+    systemToolFn: 'status_details',
+    feedbackStep: 'status_analysis',
+    nextTool: 'end',
+    metadata: {
+      description: 'Get detailed task breakdown and metrics',
+      requiredContext: ['task_count', 'status_breakdown']
+    }
+  },
+  // Add tool flow steps
+  {
+    id: 'step_add_validate',
+    toolFlowId: 'tf_add_001',
+    stepOrder: 1,
+    systemToolFn: 'add_task',
+    feedbackStep: 'analytical_validation',
+    nextTool: 'taskpilot_add',
+    metadata: {
+      description: 'Validate task description with analytical framework',
+      requiredContext: ['task_description', 'workspace_path'],
+      stepId: 'validate',
+      nextStepId: 'create'
+    }
+  },
+  {
+    id: 'step_add_create',
+    toolFlowId: 'tf_add_001',
+    stepOrder: 2,
+    systemToolFn: 'add_task',
+    feedbackStep: 'task_creation_success',
+    nextTool: 'end',
+    metadata: {
+      description: 'Create task in database and generate confirmation',
+      requiredContext: ['task_title', 'task_description'],
+      stepId: 'create'
+    }
+  },
+  // Update tool flow steps
+  {
+    id: 'step_update_task',
+    toolFlowId: 'tf_update_001',
+    stepOrder: 1,
+    systemToolFn: 'update_task',
+    feedbackStep: 'task_update_confirmation',
+    nextTool: 'end',
+    metadata: {
+      description: 'Update task field and provide confirmation',
+      requiredContext: ['task_id', 'field_updated', 'new_value']
+    }
+  },
+  // Focus tool flow steps
+  {
+    id: 'step_focus_task',
+    toolFlowId: 'tf_focus_001',
+    stepOrder: 1,
+    systemToolFn: 'focus_task',
+    feedbackStep: 'task_focus_context',
+    nextTool: 'end',
+    metadata: {
+      description: 'Focus on specific task with full context',
+      requiredContext: ['task_id', 'task_title', 'task_status']
+    }
+  },
+  // Audit tool flow steps
+  {
+    id: 'step_audit_tasks',
+    toolFlowId: 'tf_audit_001',
+    stepOrder: 1,
+    systemToolFn: 'audit_tasks',
+    feedbackStep: 'audit_analysis',
+    nextTool: 'end',
+    metadata: {
+      description: 'Perform comprehensive project audit',
+      requiredContext: ['workspace_path', 'task_count']
+    }
+  },
+  // Init tool flow steps
+  {
+    id: 'step_init_project',
+    toolFlowId: 'tf_init_001',
+    stepOrder: 1,
+    systemToolFn: 'init_project',
+    feedbackStep: 'init_feedback',
+    nextTool: 'taskpilot_start',
+    metadata: {
+      description: 'Initialize project structure and rules',
+      requiredContext: ['project_requirements', 'workspace_path']
+    }
+  },
+  // Start tool flow steps
+  {
+    id: 'step_start_workspace',
+    toolFlowId: 'tf_start_001',
+    stepOrder: 1,
+    systemToolFn: 'start_workspace',
+    feedbackStep: 'start_feedback',
+    nextTool: 'end',
+    metadata: {
+      description: 'Initialize workspace context with rules',
+      requiredContext: ['workspace_name', 'workspace_path']
+    }
   }
 ];

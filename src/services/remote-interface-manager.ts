@@ -1,4 +1,5 @@
 import { DatabaseService } from './database-service.js';
+import { ToolNames } from '../constants/tool-names.js';
 
 export interface RemoteInterface {
     id: string;
@@ -244,7 +245,7 @@ export class RemoteInterfaceManager {
             switch (remoteInterface.interface_type) {
                 case 'github':
                     // GitHub sync is handled by GitHubTool
-                    throw new Error('GitHub synchronization should use taskpilot_github tool');
+                    throw new Error(`GitHub synchronization should use ${ToolNames.GITHUB} tool`);
                 case 'jira':
                     await this.syncJiraInterface(remoteInterface, result);
                     break;

@@ -6,6 +6,7 @@
  * Unified server that combines MCP server + UI + REST API
  */
 
+import { ToolNames } from './constants/tool-names.js';
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -13,10 +14,17 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 
-import { initializeGlobalDatabaseService } from './database/global-queries.js';
+import { initializeGlobalDatabaseService, type GlobalDatabaseService } from './database/global-queries.js';
 import { DatabaseService } from './services/database-service.js';
 import { SeedManager } from './services/seed-manager.js';
 import { PromptOrchestrator } from './services/prompt-orchestrator.js';
+
+// Type definitions
+interface CmdOptions {
+  mode?: 'stdio' | 'http';
+  port?: number;
+  help?: boolean;
+}
 
 // Utils
 import { parseCliArgs, displayHelp } from './utils/cli-parser.js';
@@ -27,14 +35,13 @@ import { ExpressServer, MCPToolHandlers } from './server/express-server.js';
 
 import { zodToJsonSchema } from 'zod-to-json-schema';
 // Tools
-import { InitTool, initToolSchema } from './tools/init.js';
+import { InitToolNew, initToolSchema } from './tools/init.js';
 import { StartTool, startToolSchema } from './tools/start.js';
-import { AddTool, addToolSchema } from './tools/add.js';
-import { CreateTaskTool, createTaskToolSchema } from './tools/create-task.js';
-import { StatusTool, statusToolSchema } from './tools/status.js';
-import { UpdateTool, updateToolSchema } from './tools/update.js';
-import { AuditTool, auditToolSchema } from './tools/audit.js';
-import { FocusTool, focusToolSchema } from './tools/focus.js';
+import { AddToolNew, addToolSchema } from './tools/add.js';
+import { StatusToolNew, statusToolSchema } from './tools/status.js';
+import { UpdateToolNew, updateToolSchema } from './tools/update.js';
+import { AuditToolNew, auditToolSchema } from './tools/audit.js';
+import { FocusToolNew, focusToolSchema } from './tools/focus.js';
 import { GitHubTool, githubToolSchema } from './tools/github.js';
 import { RuleUpdateTool, ruleUpdateToolSchema } from './tools/rule-update.js';
 import { RemoteInterfaceTool, remoteInterfaceToolSchema } from './tools/remote-interface.js';
@@ -76,21 +83,21 @@ function convertToMCPResult(result: ToolStepResult | TaskPilotToolResult): TaskP
 // Global variables
 let seedManager: SeedManager;
 let orchestrator: PromptOrchestrator;
-let initTool: InitTool;
+let initTool: InitToolNew;
 let startTool: StartTool;
-let addTool: AddTool;
-let createTaskTool: CreateTaskTool;
-let statusTool: StatusTool;
-let updateTool: UpdateTool;
-let auditTool: AuditTool;
-let focusTool: FocusTool;
+let addTool: AddToolNew;
+
+let statusTool: StatusToolNew;
+let updateTool: UpdateToolNew;
+let auditTool: AuditToolNew;
+let focusTool: FocusToolNew;
 let githubTool: GitHubTool;
 let ruleUpdateTool: RuleUpdateTool;
 let remoteInterfaceTool: RemoteInterfaceTool;
 let updateResourcesTool: UpdateResourcesTool;
 let updateStepsTool: UpdateStepsTool;
 
-let globalDbService: any;
+let globalDbService: GlobalDatabaseService;
 let databaseService: DatabaseService;
 let expressServer: ExpressServer | null = null;
 
@@ -109,14 +116,14 @@ async function initializeServer() {
     orchestrator = new PromptOrchestrator(globalDrizzleManager);
 
     // Initialize tools with pure Drizzle database manager
-    initTool = new InitTool(globalDrizzleManager);
+    initTool = new InitToolNew(globalDrizzleManager);
     startTool = new StartTool(globalDrizzleManager);
-    addTool = new AddTool(globalDrizzleManager);
-    createTaskTool = new CreateTaskTool(globalDrizzleManager);
-    statusTool = new StatusTool(globalDrizzleManager);
-    updateTool = new UpdateTool(globalDrizzleManager);
-    auditTool = new AuditTool(globalDrizzleManager);
-    focusTool = new FocusTool(globalDrizzleManager);
+    addTool = new AddToolNew(globalDrizzleManager);
+
+    statusTool = new StatusToolNew(globalDrizzleManager);
+    updateTool = new UpdateToolNew(globalDrizzleManager);
+    auditTool = new AuditToolNew(globalDrizzleManager);
+    focusTool = new FocusToolNew(globalDrizzleManager);
     githubTool = new GitHubTool(globalDrizzleManager);
     ruleUpdateTool = new RuleUpdateTool(globalDrizzleManager);
     remoteInterfaceTool = new RemoteInterfaceTool(globalDrizzleManager);
@@ -138,67 +145,62 @@ function createMCPToolHandlers(): MCPToolHandlers {
       return {
         tools: [
           {
-            name: "taskpilot_init",
+            name: ToolNames.INIT,
             description: "Initialize a TaskPilot workspace with .task folder structure and configuration",
             inputSchema: zodToJsonSchema(initToolSchema),
           },
           {
-            name: "taskpilot_start",
+            name: ToolNames.START,
             description: "Initialize TaskPilot session for a workspace and provide comprehensive project context",
             inputSchema: zodToJsonSchema(startToolSchema),
           },
           {
-            name: "taskpilot_add",
+            name: ToolNames.ADD,
             description: "Orchestrate task creation workflow with analytical validation",
             inputSchema: zodToJsonSchema(addToolSchema),
           },
           {
-            name: "taskpilot_create_task",
-            description: "Create a new task after validation passes",
-            inputSchema: zodToJsonSchema(createTaskToolSchema),
-          },
-          {
-            name: "taskpilot_status",
+            name: ToolNames.STATUS,
             description: "Generate comprehensive project status report with analysis and recommendations",
             inputSchema: zodToJsonSchema(statusToolSchema),
           },
           {
-            name: "taskpilot_update",
+            name: ToolNames.UPDATE,
             description: "Update task properties with audit trail and validation",
             inputSchema: zodToJsonSchema(updateToolSchema),
           },
           {
-            name: "taskpilot_audit",
+            name: ToolNames.AUDIT,
             description: "Perform comprehensive project audit with health checking and cleanup recommendations",
             inputSchema: zodToJsonSchema(auditToolSchema),
           },
           {
-            name: "taskpilot_focus",
+            name: ToolNames.FOCUS,
             description: "Focus on a specific task and provide comprehensive implementation context",
             inputSchema: zodToJsonSchema(focusToolSchema),
           },
           {
-            name: "taskpilot_github",
+            name: ToolNames.GITHUB,
             description: "Integrate with GitHub for issue creation, PR management, and task synchronization",
             inputSchema: zodToJsonSchema(githubToolSchema),
           },
           {
-            name: "taskpilot_rule_update",
+            name: ToolNames.RULE_UPDATE,
             description: "Manage workspace-specific rules and guidelines",
             inputSchema: zodToJsonSchema(ruleUpdateToolSchema),
           },
           {
-            name: "taskpilot_remote_interface",
+            name: ToolNames.REMOTE_INTERFACE,
             description: "Manage connections to external systems for task synchronization",
             inputSchema: zodToJsonSchema(remoteInterfaceToolSchema),
           },
           {
-            name: "taskpilot_update_resources",
+            name: ToolNames.UPDATE_RESOURCES,
             description: "Update project documentation resources like project.md and design.md",
             inputSchema: zodToJsonSchema(updateResourcesToolSchema),
           },
           {
-            name: "taskpilot_update_steps",
+            name: ToolNames.UPDATE_STEPS,
             description: "Update workspace-specific feedback steps and validation rules",
             inputSchema: zodToJsonSchema(updateStepsToolSchema),
           },
@@ -206,19 +208,16 @@ function createMCPToolHandlers(): MCPToolHandlers {
       };
     },
 
-    async handleToolCall(name: string, args: any) {
+    async handleToolCall(name: string, args: Record<string, unknown>) {
       try {
         switch (name) {
-          case 'taskpilot_init': {
+          case ToolNames.INIT: {
             const input = initToolSchema.parse(args);
             const result = await initTool.execute(input);
-            return {
-              content: result.content,
-              isError: result.isError
-            };
+            return convertToMCPResult(result);
           }
 
-          case 'taskpilot_start': {
+          case ToolNames.START: {
             const input = startToolSchema.parse(args);
             const result = await startTool.execute(input);
             return {
@@ -227,46 +226,39 @@ function createMCPToolHandlers(): MCPToolHandlers {
             };
           }
 
-          case 'taskpilot_add': {
+          case ToolNames.ADD: {
             const input = addToolSchema.parse(args);
             const result = await addTool.execute(input);
             return convertToMCPResult(result);
           }
 
-          case 'taskpilot_create_task': {
-            const input = createTaskToolSchema.parse(args);
-            const result = await createTaskTool.execute(input);
-            return convertToMCPResult(result);
-          }
 
-          case 'taskpilot_status': {
+
+          case ToolNames.STATUS: {
             const input = statusToolSchema.parse(args);
             const result = await statusTool.execute(input);
             return convertToMCPResult(result);
           }
 
-          case 'taskpilot_update': {
+          case ToolNames.UPDATE: {
             const input = updateToolSchema.parse(args);
             const result = await updateTool.execute(input);
             return convertToMCPResult(result);
           }
 
-          case 'taskpilot_audit': {
+          case ToolNames.AUDIT: {
             const input = auditToolSchema.parse(args);
             const result = await auditTool.execute(input);
-            return {
-              content: result.content,
-              isError: result.isError
-            };
+            return convertToMCPResult(result);
           }
 
-          case 'taskpilot_focus': {
+          case ToolNames.FOCUS: {
             const input = focusToolSchema.parse(args);
             const result = await focusTool.execute(input);
             return convertToMCPResult(result);
           }
 
-          case 'taskpilot_github': {
+          case ToolNames.GITHUB: {
             const input = githubToolSchema.parse(args);
             const result = await githubTool.execute(input);
             return {
@@ -275,7 +267,7 @@ function createMCPToolHandlers(): MCPToolHandlers {
             };
           }
 
-          case 'taskpilot_rule_update': {
+          case ToolNames.RULE_UPDATE: {
             const input = ruleUpdateToolSchema.parse(args);
             const result = await ruleUpdateTool.execute(input);
             return {
@@ -284,7 +276,7 @@ function createMCPToolHandlers(): MCPToolHandlers {
             };
           }
 
-          case 'taskpilot_remote_interface': {
+          case ToolNames.REMOTE_INTERFACE: {
             const input = remoteInterfaceToolSchema.parse(args);
             const result = await remoteInterfaceTool.execute(input);
             return {
@@ -293,7 +285,7 @@ function createMCPToolHandlers(): MCPToolHandlers {
             };
           }
 
-          case 'taskpilot_update_resources': {
+          case ToolNames.UPDATE_RESOURCES: {
             const input = updateResourcesToolSchema.parse(args);
             const result = await updateResourcesTool.execute(input);
             return {
@@ -302,7 +294,7 @@ function createMCPToolHandlers(): MCPToolHandlers {
             };
           }
 
-          case 'taskpilot_update_steps': {
+          case ToolNames.UPDATE_STEPS: {
             const input = updateStepsToolSchema.parse(args);
             const result = await updateStepsTool.execute(input);
             return {
@@ -325,7 +317,7 @@ function createMCPToolHandlers(): MCPToolHandlers {
   };
 }
 
-async function startStdioMode(cliOptions: any) {
+async function startStdioMode(cliOptions: CmdOptions) {
   // POTENTIAL ISSUE: This console.log goes to stdout, violating MCP protocol
   if (cliOptions.mode !== 'stdio') {
     // Allow error logs only in test for debugging
@@ -447,7 +439,7 @@ function setupGracefulShutdown(): void {
 }
 
 async function main() {
-  let cliOptions: any;
+  let cliOptions: CmdOptions | undefined;
   try {
     // Parse CLI arguments
     cliOptions = parseCliArgs();
@@ -520,7 +512,7 @@ async function main() {
         // Avoid debug logs in stdio mode
         await startStdioMode(cliOptions);
       }
-      await startHttpMode(cliOptions.port);
+      await startHttpMode(cliOptions.port || 3000);
     }
 
   } catch (error) {
@@ -535,7 +527,7 @@ async function main() {
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch((err) => {
     // Only log error if not in stdio mode
-    let cliOptions: any;
+    let cliOptions: CmdOptions;
     try {
       cliOptions = parseCliArgs();
     } catch {

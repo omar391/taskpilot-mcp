@@ -1,92 +1,101 @@
 import { z } from 'zod';
-import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
+import { v4 as uuidv4 } from 'uuid';
 import type { TaskPilotToolResult, ToolStepResult, MultiStepToolInput } from '../types/index.js';
-import { PromptOrchestrator } from '../services/prompt-orchestrator.js';
-import { GlobalDatabaseService } from '../database/global-queries.js';
+import { BaseTool, BaseToolConfig, ToolDefinition, createBaseToolSchema } from './base-tool.js';
+import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
+import { WorkspaceDatabaseService } from '../database/workspace-queries.js';
+import type { NewTask } from '../database/schema/workspace-schema.js';
+import { DatabaseService } from '../services/database-service.js';
+import { ToolFlowExecutor, type StepHandlerMap, type DatabaseDrivenTool } from '../services/tool-flow-executor.js';
+import { ToolNames } from '../constants/tool-names.js';
 
-// Input schema for taskpilot_add tool with multi-step support
-export const addToolSchema = z.object({
-  stepId: z.string().optional().describe('Optional step ID for multi-step workflow'),
-  task_description: z.string().describe('Description of the task to be created'),
-  workspace_path: z.string().describe('Absolute path to the workspace directory'),
-  priority: z.enum(['High', 'Medium', 'Low']).optional().describe('Task priority level (defaults to Medium)'),
-  parent_task_id: z.string().optional().describe('ID of parent task if this is a subtask')
-});
+export const addToolSchema = createBaseToolSchema(ToolNames.ADD, {
+  task_description: z.string().describe('Description of the task to add'),
+}, ['task_description', 'workspace_path']);
 
 export type AddToolInput = z.infer<typeof addToolSchema>;
 
 /**
- * TaskPilot Add Tool - Multi-Step Task Creation Workflow
+ * TaskPilot Add Tool - Refactored using BaseTool interface
  * 
- * Enhanced with multi-step support where LLM can call the same tool with different stepIds:
- * - No stepId: Initial validation step
- * - stepId="validate": Analytical validation step  
- * - stepId="create": Final task creation step
- * 
- * This replaces the old orchestration pattern with direct step management.
+ * Enhanced with database-driven stepId enumeration and common error handling.
+ * Demonstrates the new pattern all tools should follow.
  */
-export class AddTool {
-  private orchestrator: PromptOrchestrator;
-  private globalDb: GlobalDatabaseService;
+export class AddToolNew extends BaseTool {
+  constructor(drizzleDb: DrizzleDatabaseManager) {
+    const config: BaseToolConfig = {
+      name: ToolNames.ADD,
+      description: 'Multi-step task creation workflow with analytical validation and creation. Supports dynamic stepId parameter for iterative LLM calls.',
+      requiredFields: ['task_description', 'workspace_path'],
+      additionalProperties: {
+        task_description: {
+          type: 'string',
+          description: 'Description of the task to be created'
+        },
+        priority: {
+          type: 'string',
+          enum: ['High', 'Medium', 'Low'],
+          description: 'Task priority level (defaults to Medium)'
+        },
+        parent_task_id: {
+          type: 'string',
+          description: 'ID of parent task if this is a subtask'
+        },
+        title: {
+          type: 'string',
+          description: 'Concise task title (will be generated from description if not provided)'
+        }
+      }
+    };
 
-  constructor(private drizzleDb: DrizzleDatabaseManager) {
-    this.orchestrator = new PromptOrchestrator(drizzleDb);
-    this.globalDb = new GlobalDatabaseService(drizzleDb);
+    super(drizzleDb, config);
   }
 
   /**
-   * Execute taskpilot_add tool with multi-step support
+   * Execute taskpilot_add tool with multi-step support using base class validation
    */
-  async execute(input: AddToolInput): Promise<ToolStepResult | TaskPilotToolResult> {
+  async execute(input: MultiStepToolInput): Promise<ToolStepResult | TaskPilotToolResult> {
     try {
-      const { stepId, task_description, workspace_path, priority = 'Medium', parent_task_id } = input;
+      const { stepId, workspace_path } = input;
+      const { task_description, priority = 'Medium', parent_task_id, title } = input as AddToolInput;
 
-      // Ensure workspace exists for all steps
-      const workspace = await this.globalDb.getWorkspaceByPath(workspace_path);
-      if (!workspace) {
-        return {
-          content: [{
-            type: 'text',
-            text: `Error: Workspace not found at path: ${workspace_path}. Please run taskpilot_start first to initialize the workspace.`
-          }],
-          isError: true
-        };
+      // Use base class workspace validation
+      const workspaceValidation = await this.validateWorkspace(workspace_path);
+      if (!workspaceValidation.isValid) {
+        return this.createErrorResult(workspaceValidation.error!, { workspace_path });
       }
 
-      // Route to appropriate step handler
+      const workspace = workspaceValidation.workspace;
+
+      // Route to appropriate step handler using database-driven flow
       switch (stepId) {
         case 'validate':
-          return await this.handleValidationStep(input, workspace);
+          return await this.handleValidationStep(input as AddToolInput, workspace);
         case 'create':
-          return await this.handleCreationStep(input, workspace);
+          return await this.handleCreationStep(input as AddToolInput, workspace);
         default:
-          return await this.handleInitialStep(input, workspace);
+          return await this.handleInitialStep(input as AddToolInput, workspace);
       }
+
     } catch (error) {
-      console.error('Error in taskpilot_add:', error);
-      return {
-        content: [{
-          type: 'text',
-          text: `Error processing task creation: ${error instanceof Error ? error.message : 'Unknown error'}`
-        }],
-        isError: true
-      };
+      const errorMessage = `Error in taskpilot_add: ${error instanceof Error ? error.message : String(error)}`;
+      return this.createErrorResult(errorMessage, { input });
     }
   }
 
   /**
-   * Initial step - provide analytical validation framework
+   * Initial step - start analytical validation workflow
    */
   private async handleInitialStep(input: AddToolInput, workspace: any): Promise<TaskPilotToolResult> {
     const { task_description, priority, parent_task_id } = input;
 
-    // Generate orchestrated prompt for initial guidance
+    // Generate initial prompt using orchestrator
     const orchestrationResult = await this.orchestrator.orchestratePrompt(
-      'taskpilot_add',
+      ToolNames.ADD,
       workspace.id,
       {
         task_description,
-        priority,
+        priority: priority || 'Medium',
         parent_task_id,
         step: 'initial'
       }
@@ -95,17 +104,14 @@ export class AddTool {
     const stepResult: ToolStepResult = {
       isFinalStep: false,
       nextStepId: 'validate',
-      feedback: `Apply analytical validation to the task description: "${task_description}"`,
+      feedback: `Apply analytical validation to the task description: \"${task_description}\"`,
       data: { task_description, priority, parent_task_id }
     };
 
-    return {
-      content: [{
-        type: 'text',
-        text: `${orchestrationResult.prompt_text}\n\n**NEXT STEP:** Call taskpilot_add with stepId="validate" after applying analytical validation.`
-      }],
+    return this.createSuccessResult(
+      `${orchestrationResult.prompt_text}\\n\\n**NEXT STEP:** Call taskpilot_add with stepId=\"validate\" after applying analytical validation.`,
       stepResult
-    };
+    );
   }
 
   /**
@@ -116,7 +122,7 @@ export class AddTool {
 
     // Generate validation-specific prompt
     const orchestrationResult = await this.orchestrator.orchestratePrompt(
-      'taskpilot_add',
+      ToolNames.ADD,
       workspace.id,
       {
         task_description,
@@ -133,49 +139,110 @@ export class AddTool {
       data: { task_description, priority, parent_task_id, validated: true }
     };
 
-    return {
-      content: [{
-        type: 'text',
-        text: `${orchestrationResult.prompt_text}\n\n**NEXT STEP:** Call taskpilot_add with stepId="create" to create the validated task.`
-      }],
+    return this.createSuccessResult(
+      `${orchestrationResult.prompt_text}\\n\\n**NEXT STEP:** Call taskpilot_add with stepId=\"create\" to create the validated task.`,
       stepResult
-    };
+    );
   }
 
-  /**
-   * Creation step - call taskpilot_create_task
+    /**
+   * Handle creation step - create task directly
    */
   private async handleCreationStep(input: AddToolInput, workspace: any): Promise<TaskPilotToolResult> {
-    const { task_description, priority, parent_task_id } = input;
+    const { task_description, priority, parent_task_id, title } = input;
 
-    const stepResult: ToolStepResult = {
-      isFinalStep: true,
-      feedback: `Task validation complete. Now call taskpilot_create_task to create the task.`,
-      data: {
-        task_description,
-        priority,
-        parent_task_id,
-        workspace_path: workspace.path,
-        ready_for_creation: true
-      }
-    };
+    try {
+      // Generate task ID and title if not provided
+      const taskId = `TP-${String(Date.now()).slice(-6)}`;
+      const taskTitle = title || this.generateTaskTitle(task_description);
 
-    return {
-      content: [{
-        type: 'text',
-        text: `Task requirements validated successfully!\n\n**FINAL ACTION:** Call \`taskpilot_create_task\` with:\n- task_description: "${task_description}"\n- workspace_path: "${workspace.path}"\n- priority: "${priority}"${parent_task_id ? `\n- parent_task_id: "${parent_task_id}"` : ''}`
-      }],
-      stepResult
-    };
+      // Create task in workspace database
+      const workspaceDb = new WorkspaceDatabaseService(workspace.path);
+      await workspaceDb.initialize();
+
+      const newTask: NewTask = {
+        id: taskId,
+        title: taskTitle,
+        description: task_description,
+        priority: (priority?.toLowerCase() as 'high' | 'medium' | 'low') || 'medium',
+        status: 'backlog',
+        progress: 0,
+        dependencies: [],
+        notes: '',
+        connectedFiles: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      await workspaceDb.createTask(newTask);
+
+      // Generate success prompt
+      const orchestrationResult = await this.orchestrator.orchestratePrompt(
+        ToolNames.ADD,
+        workspace.id,
+        {
+          task_id: taskId,
+          task_title: taskTitle,
+          task_description,
+          priority,
+          parent_task_id,
+          step: 'created'
+        }
+      );
+
+      return this.createSuccessResult(
+        orchestrationResult.prompt_text,
+        {
+          isFinalStep: true,
+          feedback: `Task ${taskId} created successfully`,
+          data: {
+            task_id: taskId,
+            task_title: taskTitle,
+            created: true,
+            workspace_id: workspace.id
+          }
+        }
+      );
+
+    } catch (error) {
+      return this.createErrorResult(
+        `Failed to create task: ${error instanceof Error ? error.message : String(error)}`,
+        { task_description, workspace_path: workspace.path }
+      );
+    }
   }
 
   /**
-   * Get tool definition for MCP server with multi-step support
+   * Generate a concise task title from description
    */
-  static getToolDefinition() {
+  private generateTaskTitle(description: string): string {
+    // Extract first sentence or first 50 characters
+    const sentences = description.split(/[.!?]+/);
+    const firstSentence = sentences[0]?.trim();
+
+    if (firstSentence && firstSentence.length <= 60) {
+      return firstSentence;
+    }
+
+    // Fallback to first 50 characters with ellipsis
+    return description.substring(0, 50).trim() + (description.length > 50 ? '...' : '');
+  }
+
+  /**
+   * Get tool definition with dynamic stepId enumeration
+   */
+  static async getToolDefinitionDynamic(drizzleDb: DrizzleDatabaseManager): Promise<ToolDefinition> {
+    const instance = new AddToolNew(drizzleDb);
+    return await instance.getToolDefinition();
+  }
+
+  /**
+   * Static tool definition for immediate use (fallback)
+   */
+  static getToolDefinition(): ToolDefinition {
     return {
-      name: 'taskpilot_add',
-      description: 'Multi-step task creation workflow with analytical validation. Supports stepId parameter for iterative LLM calls.',
+      name: ToolNames.ADD,
+      description: 'Multi-step task creation workflow with analytical validation. Supports dynamic stepId parameter for iterative LLM calls.',
       inputSchema: {
         type: 'object',
         properties: {

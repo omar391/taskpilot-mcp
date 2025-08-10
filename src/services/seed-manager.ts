@@ -5,16 +5,19 @@ import {
   toolFlows,
   feedbackSteps,
   mcpServerMappings,
+  toolFlowSteps,
   type ToolFlow,
   type FeedbackStep,
   type NewToolFlow,
   type NewFeedbackStep,
-  type NewMcpServerMapping
+  type NewMcpServerMapping,
+  type NewToolFlowStep
 } from '../database/schema/global-schema.js';
 import {
   GLOBAL_TOOL_FLOWS_SEED,
   GLOBAL_FEEDBACK_STEPS_SEED,
-  MCP_SERVER_MAPPINGS_SEED
+  MCP_SERVER_MAPPINGS_SEED,
+  GLOBAL_TOOL_FLOW_STEPS_SEED
 } from '../data/embedded-seed-data.js';
 import { isStdioMode } from '../utils/cli-parser.js';
 /**
@@ -34,6 +37,7 @@ export class SeedManager {
   async initializeGlobalData(): Promise<void> {
     try {
       // Clear existing global data using type-safe Drizzle deletes
+      await this.drizzleDb.delete(toolFlowSteps);
       await this.drizzleDb.delete(toolFlows).where(isNull(toolFlows.workspaceId));
       await this.drizzleDb.delete(feedbackSteps).where(isNull(feedbackSteps.workspaceId));
       await this.drizzleDb.delete(mcpServerMappings);
@@ -41,6 +45,7 @@ export class SeedManager {
       // Insert global data using type-safe Drizzle inserts
       await this.drizzleDb.insert(feedbackSteps).values(GLOBAL_FEEDBACK_STEPS_SEED);
       await this.drizzleDb.insert(toolFlows).values(GLOBAL_TOOL_FLOWS_SEED);
+      await this.drizzleDb.insert(toolFlowSteps).values(GLOBAL_TOOL_FLOW_STEPS_SEED);
       await this.drizzleDb.insert(mcpServerMappings).values(MCP_SERVER_MAPPINGS_SEED);
 
       if (!isStdioMode()) {

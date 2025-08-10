@@ -1,186 +1,160 @@
 import { z } from 'zod';
-import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
 import type { TaskPilotToolResult, ToolStepResult, MultiStepToolInput } from '../types/index.js';
-import { PromptOrchestrator } from '../services/prompt-orchestrator.js';
-import { GlobalDatabaseService } from '../database/global-queries.js';
+import { BaseTool, BaseToolConfig, ToolDefinition, createBaseToolSchema } from './base-tool.js';
+import type { DrizzleDatabaseManager } from '../database/drizzle-connection.js';
 
-// Input schema for taskpilot_focus tool with multi-step support
-export const focusToolSchema = z.object({
-  stepId: z.string().optional().describe('Step ID for multi-step flow: analyze, plan, implement'),
-  task_id: z.string().describe('Task ID to focus on (e.g., TP-001)'),
-  workspace_path: z.string().describe('Absolute path to the workspace directory')
-});
+// Input schema using the new base pattern
+export const focusToolSchema = createBaseToolSchema('taskpilot_focus', {
+  task_id: z.string().describe('Task ID to focus on (e.g., TP-001)')
+}, ['task_id', 'workspace_path']);
 
-export type FocusToolInput = z.infer<typeof focusToolSchema> & MultiStepToolInput;
+export type FocusToolInput = z.infer<typeof focusToolSchema>;
 
 /**
- * TaskPilot Focus Tool - Task Focusing (Pure TypeScript/Drizzle)
+ * TaskPilot Focus Tool - Refactored using BaseTool interface
  * 
- * MCP tool for setting active task context and providing implementation guidance.
- * Provides comprehensive context about the focused task including dependencies,
- * connected files, and implementation recommendations.
+ * Enhanced with database-driven stepId enumeration and common error handling.
  */
-export class FocusTool {
-  private orchestrator: PromptOrchestrator;
-  private globalDb: GlobalDatabaseService;
+export class FocusToolNew extends BaseTool {
+  constructor(drizzleDb: DrizzleDatabaseManager) {
+    const config: BaseToolConfig = {
+      name: 'taskpilot_focus',
+      description: 'Focus on specific task and provide implementation guidance. Supports multi-step workflow.',
+      requiredFields: ['task_id', 'workspace_path'],
+      additionalProperties: {
+        task_id: {
+          type: 'string',
+          description: 'Task ID to focus on (e.g., TP-001)'
+        }
+      }
+    };
 
-  constructor(private drizzleDb: DrizzleDatabaseManager) {
-    this.orchestrator = new PromptOrchestrator(drizzleDb);
-    this.globalDb = new GlobalDatabaseService(drizzleDb);
+    super(drizzleDb, config);
   }
 
   /**
-   * Execute taskpilot_focus tool with multi-step support
+   * Execute taskpilot_focus tool with multi-step support using base class validation
    */
-  async execute(input: FocusToolInput): Promise<ToolStepResult> {
+  async execute(input: MultiStepToolInput): Promise<ToolStepResult | TaskPilotToolResult> {
     try {
-      const { task_id, workspace_path, stepId } = input;
+      const { stepId, workspace_path } = input;
+      const { task_id } = input as FocusToolInput;
 
-      // Get workspace
-      const workspace = await this.globalDb.getWorkspaceByPath(workspace_path);
-      if (!workspace) {
+      // Use base class workspace validation
+      const workspaceValidation = await this.validateWorkspace(workspace_path);
+      if (!workspaceValidation.isValid) {
         return {
           isFinalStep: true,
-          feedback: `Error: Workspace not found at path: ${workspace_path}. Please run taskpilot_start first to initialize the workspace.`,
-          data: { error: true, workspace_path: workspace_path }
+          feedback: workspaceValidation.error!,
+          data: { error: true, workspace_path }
         };
       }
 
-      // Update workspace active task
-      await this.globalDb.updateWorkspace(workspace.id, {
-        activeTask: task_id,
-        updatedAt: new Date().toISOString()
-      });
+      const workspace = workspaceValidation.workspace;
 
-      // Handle multi-step flow
-      if (stepId === 'analyze') {
-        return await this.handleAnalyzeStep(workspace, task_id, workspace_path);
-      } else if (stepId === 'plan') {
-        return await this.handlePlanStep(workspace, task_id, workspace_path);
-      } else if (stepId === 'implement') {
-        return await this.handleImplementStep(workspace, task_id, workspace_path);
+      // Route to appropriate step handler
+      switch (stepId) {
+        case 'analyze':
+          return await this.handleAnalyzeStep(input as FocusToolInput, workspace);
+        case 'plan':
+          return await this.handlePlanStep(input as FocusToolInput, workspace);
+        case 'implement':
+          return await this.handleImplementStep(input as FocusToolInput, workspace);
+        default:
+          return await this.handleInitialStep(input as FocusToolInput, workspace);
       }
 
-      // Default: overview and context setting
-      return await this.handleFocusOverview(workspace, task_id, workspace_path);
-
     } catch (error) {
-      console.error('Error in taskpilot_focus:', error);
+      const errorMessage = `Error in taskpilot_focus: ${error instanceof Error ? error.message : String(error)}`;
       return {
         isFinalStep: true,
-        feedback: `Error focusing on task: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        data: { error: true, workspace_path: input.workspace_path }
+        feedback: errorMessage,
+        data: { error: true, input }
       };
     }
   }
 
-  private async handleFocusOverview(workspace: any, task_id: string, workspace_path: string): Promise<ToolStepResult> {
-    // Generate orchestrated prompt for task overview and context
+  /**
+   * Initial step - basic task focus
+   */
+  private async handleInitialStep(input: FocusToolInput, workspace: any): Promise<ToolStepResult> {
+    const { task_id } = input;
+
     const orchestrationResult = await this.orchestrator.orchestratePrompt(
       'taskpilot_focus',
       workspace.id,
       {
         task_id,
-        workspace_path,
-        workspace_name: workspace.name,
-        timestamp: new Date().toISOString(),
-        task_file_path: `${workspace_path}/.task/todo/current.md`,
-        project_file_path: `${workspace_path}/.task/project.md`,
-        rules_file_path: `${workspace_path}/.task/rules/workspace_rules.md`,
-        focus_instructions: `Set focus on task ${task_id} and provide task overview with dependencies and context`
+        step: 'initial'
       }
     );
 
     return {
       isFinalStep: false,
       nextStepId: 'analyze',
-      feedback: orchestrationResult.prompt_text + '\n\n*Next steps available: analyze (task breakdown), plan (implementation strategy), implement (execution guidance)*',
-      data: {
-        task_id,
-        workspace_id: workspace.id,
-        focused: true,
-        available_steps: ['analyze', 'plan', 'implement']
-      }
+      feedback: orchestrationResult.prompt_text,
+      data: { task_id, focused: true }
     };
   }
 
-  private async handleAnalyzeStep(workspace: any, task_id: string, workspace_path: string): Promise<ToolStepResult> {
-    // Generate detailed task analysis
+  /**
+   * Analyze step - detailed task analysis
+   */
+  private async handleAnalyzeStep(input: FocusToolInput, workspace: any): Promise<ToolStepResult> {
+    const { task_id } = input;
+
     const orchestrationResult = await this.orchestrator.orchestratePrompt(
       'taskpilot_focus',
       workspace.id,
       {
         task_id,
-        workspace_path,
-        workspace_name: workspace.name,
-        analysis_mode: true,
-        timestamp: new Date().toISOString(),
-        task_file_path: `${workspace_path}/.task/todo/current.md`,
-        project_file_path: `${workspace_path}/.task/project.md`,
-        rules_file_path: `${workspace_path}/.task/rules/workspace_rules.md`,
-        focus_instructions: `Analyze task ${task_id} for complexity, dependencies, file connections, and potential challenges`
+        step: 'analyze'
       }
     );
 
     return {
       isFinalStep: false,
       nextStepId: 'plan',
-      feedback: orchestrationResult.prompt_text + '\n\n*Proceed to plan step for implementation strategy*',
-      data: {
-        task_id,
-        workspace_id: workspace.id,
-        analyzed: true,
-        next_available: ['plan', 'implement']
-      }
+      feedback: orchestrationResult.prompt_text,
+      data: { task_id, analysis_complete: true }
     };
   }
 
-  private async handlePlanStep(workspace: any, task_id: string, workspace_path: string): Promise<ToolStepResult> {
-    // Generate implementation planning
+  /**
+   * Plan step - implementation planning
+   */
+  private async handlePlanStep(input: FocusToolInput, workspace: any): Promise<ToolStepResult> {
+    const { task_id } = input;
+
     const orchestrationResult = await this.orchestrator.orchestratePrompt(
       'taskpilot_focus',
       workspace.id,
       {
         task_id,
-        workspace_path,
-        workspace_name: workspace.name,
-        planning_mode: true,
-        timestamp: new Date().toISOString(),
-        task_file_path: `${workspace_path}/.task/todo/current.md`,
-        project_file_path: `${workspace_path}/.task/project.md`,
-        rules_file_path: `${workspace_path}/.task/rules/workspace_rules.md`,
-        focus_instructions: `Create implementation plan for task ${task_id} with step-by-step approach and resource requirements`
+        step: 'plan'
       }
     );
 
     return {
       isFinalStep: false,
       nextStepId: 'implement',
-      feedback: orchestrationResult.prompt_text + '\n\n*Proceed to implement step for execution guidance*',
-      data: {
-        task_id,
-        workspace_id: workspace.id,
-        planned: true,
-        next_available: ['implement']
-      }
+      feedback: orchestrationResult.prompt_text,
+      data: { task_id, plan_ready: true }
     };
   }
 
-  private async handleImplementStep(workspace: any, task_id: string, workspace_path: string): Promise<ToolStepResult> {
-    // Generate implementation guidance
+  /**
+   * Implement step - implementation guidance (final step)
+   */
+  private async handleImplementStep(input: FocusToolInput, workspace: any): Promise<ToolStepResult> {
+    const { task_id } = input;
+
     const orchestrationResult = await this.orchestrator.orchestratePrompt(
       'taskpilot_focus',
       workspace.id,
       {
         task_id,
-        workspace_path,
-        workspace_name: workspace.name,
-        implementation_mode: true,
-        timestamp: new Date().toISOString(),
-        task_file_path: `${workspace_path}/.task/todo/current.md`,
-        project_file_path: `${workspace_path}/.task/project.md`,
-        rules_file_path: `${workspace_path}/.task/rules/workspace_rules.md`,
-        focus_instructions: `Provide detailed implementation guidance for task ${task_id} with code examples and testing approach`
+        step: 'implement'
       }
     );
 
@@ -189,27 +163,34 @@ export class FocusTool {
       feedback: orchestrationResult.prompt_text,
       data: {
         task_id,
-        workspace_id: workspace.id,
         implementation_ready: true,
-        completed_flow: true
+        workspace_id: workspace.id
       }
     };
   }
 
   /**
-   * Get tool definition for MCP server with multi-step support
+   * Get tool definition with dynamic stepId enumeration
    */
-  static getToolDefinition() {
+  static async getToolDefinitionDynamic(drizzleDb: DrizzleDatabaseManager): Promise<ToolDefinition> {
+    const instance = new FocusToolNew(drizzleDb);
+    return await instance.getToolDefinition();
+  }
+
+  /**
+   * Static tool definition for immediate use (fallback)
+   */
+  static getToolDefinition(): ToolDefinition {
     return {
       name: 'taskpilot_focus',
-      description: 'Focus on a specific task with multi-step analysis and implementation guidance. Supports stepId parameter.',
+      description: 'Focus on specific task and provide implementation guidance. Supports multi-step workflow.',
       inputSchema: {
         type: 'object',
         properties: {
           stepId: {
             type: 'string',
             enum: ['analyze', 'plan', 'implement'],
-            description: 'Optional step ID: analyze (breakdown task), plan (strategy), implement (execution guidance)'
+            description: 'Optional step ID for multi-step workflow: analyze, plan, implement'
           },
           task_id: {
             type: 'string',
